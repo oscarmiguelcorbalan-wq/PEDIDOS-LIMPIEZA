@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fef9c3"/><stop offset="1" stop-color="#fde68a"/></linearGradient></defs>
+<rect width="240" height="240" rx="28" fill="url(#bg)"/>
+<ellipse cx="120" cy="212" rx="70" ry="9" fill="#000" opacity=".10"/>
+
+<clipPath id="c"><path d="M50 56 h140 v140 h-140z"/></clipPath>
+<path d="M50 56 h140 v140 h-140z" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/>
+<g clip-path="url(#c)" opacity=".75"><line x1="62" y1="56" x2="62" y2="196" stroke="#3b82f6" stroke-width="3"/><line x1="78" y1="56" x2="78" y2="196" stroke="#3b82f6" stroke-width="3"/><line x1="94" y1="56" x2="94" y2="196" stroke="#3b82f6" stroke-width="3"/><line x1="110" y1="56" x2="110" y2="196" stroke="#3b82f6" stroke-width="3"/><line x1="126" y1="56" x2="126" y2="196" stroke="#3b82f6" stroke-width="3"/><line x1="142" y1="56" x2="142" y2="196" stroke="#3b82f6" stroke-width="3"/><line x1="158" y1="56" x2="158" y2="196" stroke="#3b82f6" stroke-width="3"/><line x1="174" y1="56" x2="174" y2="196" stroke="#3b82f6" stroke-width="3"/><line x1="50" y1="68" x2="190" y2="68" stroke="#ef4444" stroke-width="3"/><line x1="50" y1="84" x2="190" y2="84" stroke="#ef4444" stroke-width="3"/><line x1="50" y1="100" x2="190" y2="100" stroke="#ef4444" stroke-width="3"/><line x1="50" y1="116" x2="190" y2="116" stroke="#ef4444" stroke-width="3"/><line x1="50" y1="132" x2="190" y2="132" stroke="#ef4444" stroke-width="3"/><line x1="50" y1="148" x2="190" y2="148" stroke="#ef4444" stroke-width="3"/><line x1="50" y1="164" x2="190" y2="164" stroke="#ef4444" stroke-width="3"/><line x1="50" y1="180" x2="190" y2="180" stroke="#ef4444" stroke-width="3"/></g>
+<path d="M150 196 l40 -40 v40z" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="3"/>
+<path d="M50 56 h140" stroke="#ef4444" stroke-width="6"/><path d="M50 196 h100" stroke="#ef4444" stroke-width="6"/>
+</svg>

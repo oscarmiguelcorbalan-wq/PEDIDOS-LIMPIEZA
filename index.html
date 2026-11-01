@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e7490">
+<title>Hacé tu pedido</title>
+<link rel="stylesheet" href="estilos.css">
+<style>
+  header{background:var(--pri);color:#fff;padding:14px 16px 0;position:sticky;top:0;z-index:20}
+  header .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  header h1{font-size:18px;margin:0}
+  header .cli{font-size:13px;opacity:.85}
+  header .salir{background:rgba(255,255,255,.15);border:0;color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
+  .tabs{display:flex;gap:4px;margin-top:10px}
+  .tabs button{flex:1;background:none;border:0;color:#cffafe;padding:10px;font-weight:600;border-bottom:3px solid transparent;cursor:pointer}
+  .tabs button.on{color:#fff;border-bottom-color:var(--acc)}
+  main{max-width:1000px;margin:0 auto;padding:14px 14px 120px}
+  .buscar{display:flex;gap:8px;margin-bottom:10px}
+  .cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
+  .cats button{border:1.5px solid var(--borde);background:#fff;border-radius:999px;padding:6px 12px;white-space:nowrap;cursor:pointer;font-size:13px}
+  .cats button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px}
+  .prod{display:flex;flex-direction:column;overflow:hidden}
+  .prod img{width:100%;aspect-ratio:1;object-fit:cover;display:block;background:#f1f5f9}
+  .prod .info{padding:10px;display:flex;flex-direction:column;gap:4px;flex:1}
+  .prod h3{font-size:15px;margin:0}
+  .prod .uni{font-size:12px;color:var(--tx2)}
+  .prod .precio{font-size:18px;font-weight:800;color:var(--pri-2)}
+  .prod .badges{display:flex;gap:4px;flex-wrap:wrap;min-height:22px}
+  .prod .acc{margin-top:auto;padding-top:6px}
+  .prod .stepper{width:100%}.prod .stepper input{flex:1}
+  .prod.en-carrito{outline:2.5px solid var(--pri)}
+  .barra{position:fixed;left:0;right:0;bottom:0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--borde);box-shadow:0 -6px 20px rgba(0,0,0,.08);z-index:30}
+  .barra .btn{max-width:600px;margin:0 auto;display:flex;justify-content:space-between}
+  .linea{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--borde)}
+  .linea img{width:52px;height:52px;border-radius:10px}
+  .linea .n{flex:1;min-width:0}
+  .linea .n b{display:block;font-size:14px}
+  .total{display:flex;justify-content:space-between;font-size:20px;font-weight:800;margin:14px 0}
+  .ped{padding:14px;margin-bottom:10px}
+  .ped .cab{display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer}
+  .ped table{margin-top:10px}
+  .login{max-width:380px;margin:60px auto;padding:26px;text-align:center}
+  .login img{width:96px;border-radius:20px;margin-bottom:10px}
+  .ok-pedido{text-align:center;padding:10px}
+  .ok-pedido .check{width:70px;height:70px;border-radius:50%;background:#dcfce7;color:var(--ok);font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
+  .vacio{text-align:center;color:var(--tx2);padding:40px 10px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<section id="vLogin" class="oculto">
+  <div class="login card">
+    <img src="img/lavandina.svg" alt="">
+    <h2 id="lEmpresa" style="margin:4px 0 6px">Pedidos online</h2>
+    <p class="muted">Ingresá tu código de cliente para ver los productos y hacer tu pedido.</p>
+    <div class="campo"><input id="codigo" placeholder="Código de cliente" autocomplete="off" style="text-transform:uppercase;text-align:center;font-size:18px;letter-spacing:2px"></div>
+    <button class="btn grande" id="bEntrar">Entrar</button>
+    <p class="muted" id="lErr" style="color:var(--mal)"></p>
+  </div>
+</section>
+
+<!-- APP -->
+<section id="vApp" class="oculto">
+  <header>
+    <div class="top">
+      <div><h1 id="hEmpresa"></h1><div class="cli" id="hCliente"></div></div>
+      <button class="salir" id="bSalir">Salir</button>
+    </div>
+    <div class="tabs"><button data-tab="cat" class="on">Productos</button><button data-tab="ped">Mis pedidos</button></div>
+  </header>
+  <main>
+    <div id="tCat">
+      <div class="buscar"><input id="q" placeholder="Buscar producto…" type="search"></div>
+      <div class="cats" id="cats"></div>
+      <div class="grid" id="grid"></div>
+    </div>
+    <div id="tPed" class="oculto"><div id="listaPed"></div></div>
+  </main>
+  <div class="barra oculto" id="barra"><button class="btn grande" id="bVerCarrito"><span id="bCant"></span><span id="bTot"></span></button></div>
+</section>
+
+<div id="vCarga" class="cargando"><div class="spin"></div>Cargando…</div>
+<div id="modal"></div>
+
+<script src="config.js"></script>
+<script src="comun.js"></script>
+<script>
+const S = { codigo:'', data:null, carrito:{}, cat:'Todos', q:'' };
+const $ = id => document.getElementById(id);
+const LS_COD = 'pl_codigo', LS_CAR = 'pl_carrito';
+
+function ver(v){ ['vLogin','vApp','vCarga'].forEach(x => $(x).classList.toggle('oculto', x!==v)); }
+
+async function entrar(cod){
+  ver('vCarga');
+  try{
+    S.data = await api('catalogo', { codigo: cod });
+    S.codigo = cod.toUpperCase(); localStorage.setItem(LS_COD, S.codigo);
+    try{ S.carrito = JSON.parse(localStorage.getItem(LS_CAR+'_'+S.codigo)) || {}; }catch(e){ S.carrito = {}; }
+    const ids = new Set(S.data.productos.map(p=>p.id)); Object.keys(S.carrito).forEach(k=>{ if(!ids.has(k)) delete S.carrito[k]; });
+    $('hEmpresa').textContent = S.data.empresa; $('hCliente').textContent = S.data.cliente.nombre;
+    document.title = S.data.empresa + ' · Pedidos';
+    ver('vApp'); pintarCats(); pintarGrid(); pintarBarra();
+  }catch(e){
+    localStorage.removeItem(LS_COD); ver('vLogin'); $('lErr').textContent = e.message; $('codigo').value = cod;
+  }
+}
+
+function pintarCats(){
+  const cats = ['Todos', ...new Set(S.data.productos.map(p=>p.categoria).filter(Boolean))];
+  $('cats').innerHTML = cats.map(c=>`<button class="${c===S.cat?'on':''}" data-c="${U.esc(c)}">${U.esc(c)}</button>`).join('');
+}
+
+function pintarGrid(){
+  const m = S.data.moneda; const q = S.q.trim().toLowerCase();
+  const lista = S.data.productos.filter(p => (S.cat==='Todos'||p.categoria===S.cat) && (!q || (p.nombre+' '+(p.descripcion||'')).toLowerCase().includes(q)));
+  if(!lista.length){ $('grid').innerHTML = '<div class="vacio">No hay productos con ese filtro.</div>'; return; }
+  $('grid').innerHTML = lista.map(p => {
+    const cant = S.carrito[p.id]||0;
+    const u = U.precioCatalogo(p, Math.max(cant,1));
+    const lista = p.precioLista > u.precio ? `<span class="tachado">${U.dinero(p.precioLista,m)}</span>` : '';
+    const badges = p.ofertas.map(o=>`<span class="chip oferta" title="${U.esc(o.titulo)}">🔥 ${U.esc(U.textoOferta(o,m))}</span>`).join('')
+      + (p.disponibilidad==='sin' ? '<span class="chip sin">Sin stock · consultar</span>' : p.disponibilidad==='poco' ? '<span class="chip poco">Últimas unidades</span>' : '');
+    return `<div class="prod card ${cant?'en-carrito':''}">
+      <img src="${U.esc(U.img(p.imagen))}" alt="${U.esc(p.nombre)}" loading="lazy">
+      <div class="info">
+        <h3>${U.esc(p.nombre)}</h3><div class="uni">${U.esc(p.unidad||'')}</div>
+        <div>${lista} <span class="precio">${U.dinero(u.precio,m)}</span></div>
+        <div class="badges">${badges}</div>
+        <div class="acc">${cant
+          ? `<div class="stepper"><button data-menos="${p.id}">−</button><input inputmode="numeric" data-cant="${p.id}" value="${cant}"><button data-mas="${p.id}">+</button></div>`
+          : `<button class="btn" style="width:100%" data-mas="${p.id}">Agregar</button>`}</div>
+      </div></div>`;
+  }).join('');
+}
+
+function totalCarrito(){
+  let t=0, n=0; const lineas=[];
+  S.data.productos.forEach(p=>{ const c=S.carrito[p.id]; if(c>0){ const u=U.precioCatalogo(p,c); t+=u.precio*c; n+=c; lineas.push({p,c,u}); } });
+  return {t:U.r2(t), n, lineas};
+}
+
+function setCant(id, c){
+  c = Math.max(0, Math.min(9999, parseInt(c)||0));
+  if(c) S.carrito[id]=c; else delete S.carrito[id];
+  localStorage.setItem(LS_CAR+'_'+S.codigo, JSON.stringify(S.carrito));
+  pintarBarra();
+}
+
+function pintarBarra(){
+  const {t,n} = totalCarrito();
+  $('barra').classList.toggle('oculto', !n);
+  $('bCant').textContent = `Ver pedido (${n} ${n===1?'artículo':'artículos'})`;
+  $('bTot').textContent = U.dinero(t, S.data.moneda);
+}
+
+function abrirCarrito(){
+  const m=S.data.moneda; const {t,lineas}=totalCarrito();
+  $('modal').innerHTML = `<div class="modal-fondo" data-cerrar="1"><div class="modal">
+    <div class="fila" style="justify-content:space-between"><h3 style="flex:0 1 auto">Tu pedido</h3><button class="btn gris peq" style="flex:0 0 auto" data-cerrar="1">Cerrar</button></div>
+    ${lineas.map(({p,c,u})=>`<div class="linea"><img src="${U.esc(U.img(p.imagen))}" alt="">
+      <div class="n"><b>${U.esc(p.nombre)}</b><span class="muted">${U.dinero(u.precio,m)} × ${c}${u.oferta?' · 🔥 oferta':''}</span></div>
+      <div class="stepper" style="flex:0 0 auto"><button data-menos="${p.id}">−</button><input inputmode="numeric" data-cant="${p.id}" value="${c}"><button data-mas="${p.id}">+</button></div></div>`).join('')}
+    <div class="total"><span>Total</span><span>${U.dinero(t,m)}</span></div>
+    <div class="campo"><label>Notas para el pedido (opcional)</label><textarea id="notas" rows="2" placeholder="Horario de entrega, aclaraciones…"></textarea></div>
+    <button class="btn grande" id="bEnviar">Enviar pedido</button>
+    <p class="muted" style="text-align:center">Los precios se confirman al recibir el pedido.</p>
+  </div></div>`;
+  const notas = localStorage.getItem('pl_notas'); if(notas) $('notas').value = notas;
+  $('notas').oninput = e => localStorage.setItem('pl_notas', e.target.value);
+  $('bEnviar').onclick = enviar;
+}
+
+async function enviar(){
+  const b=$('bEnviar'); b.disabled=true; b.textContent='Enviando…';
+  try{
+    const lineas = Object.entries(S.carrito).map(([id,cantidad])=>({id,cantidad}));
+    const r = await api('crearPedido', { codigo:S.codigo, lineas, notas:$('notas').value });
+    S.carrito={}; localStorage.removeItem(LS_CAR+'_'+S.codigo); localStorage.removeItem('pl_notas');
+    pintarBarra(); pintarGrid();
+    const m=S.data.moneda;
+    const txt = `Hola! Te envié el pedido ${r.id} (${S.data.cliente.nombre}) por ${U.dinero(r.total,m)}:\n` + r.lineas.map(l=>`• ${l.cantidad} × ${l.nombre}`).join('\n');
+    $('modal').innerHTML = `<div class="modal-fondo"><div class="modal ok-pedido">
+      <div class="check">✓</div><h3>¡Pedido enviado!</h3>
+      <p>Número de pedido <b>${r.id}</b><br>Total <b>${U.dinero(r.total,m)}</b></p>
+      <p class="muted">Te avisamos cuando esté confirmado. Podés seguirlo en “Mis pedidos”.</p>
+      ${S.data.whatsapp?`<a class="btn wa grande" style="margin-bottom:8px" target="_blank" href="${U.wa(S.data.whatsapp, txt)}">Avisar por WhatsApp</a>`:''}
+      <button class="btn sec grande" data-cerrar="1">Listo</button></div></div>`;
+  }catch(e){ U.toast(e.message,'error'); b.disabled=false; b.textContent='Enviar pedido'; }
+}
+
+async function pintarPedidos(){
+  $('listaPed').innerHTML = '<div class="cargando"><div class="spin"></div></div>';
+  try{
+    const ps = await api('misPedidos', {codigo:S.codigo}); const m=S.data.moneda; S.pedidos = ps;
+    if(!ps.length){ $('listaPed').innerHTML = '<div class="vacio">Todavía no hiciste pedidos.</div>'; return; }
+    $('listaPed').innerHTML = ps.map((p,i)=>`<div class="ped card">
+      <div class="cab" data-tog="${i}"><div><b>${U.esc(p.ID)}</b><div class="muted">${U.fecha(p.Fecha,true)}</div></div>
+      <div style="text-align:right"><span class="chip ${U.esc(p.Estado)}">${U.esc(p.Estado)}</span><div style="font-weight:800;margin-top:4px">${U.dinero(p.Total,m)}</div></div></div>
+      <div class="oculto" id="det${i}"><table>${p.Detalle.map(l=>`<tr><td>${l.cantidad} × ${U.esc(l.nombre)}</td><td class="num">${U.dinero(l.subtotal,m)}</td></tr>`).join('')}</table>
+      ${p['Notas cliente']?`<p class="muted">Notas: ${U.esc(p['Notas cliente'])}</p>`:''}
+      <button class="btn sec peq" style="margin-top:8px" data-repetir="${i}">Repetir este pedido</button></div></div>`).join('');
+  }catch(e){ $('listaPed').innerHTML = `<div class="vacio">${U.esc(e.message)}</div>`; }
+}
+
+/* ---------- eventos ---------- */
+document.addEventListener('click', e=>{
+  const t=e.target.closest('[data-mas],[data-menos],[data-c],[data-tab],[data-cerrar],[data-tog],[data-repetir]'); if(!t) return;
+  if(t.dataset.mas){ setCant(t.dataset.mas,(S.carrito[t.dataset.mas]||0)+1); refrescar(); }
+  else if(t.dataset.menos){ setCant(t.dataset.menos,(S.carrito[t.dataset.menos]||0)-1); refrescar(); }
+  else if(t.dataset.c){ S.cat=t.dataset.c; pintarCats(); pintarGrid(); }
+  else if(t.dataset.tab){ document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b===t));
+    $('tCat').classList.toggle('oculto',t.dataset.tab!=='cat'); $('tPed').classList.toggle('oculto',t.dataset.tab!=='ped');
+    if(t.dataset.tab==='ped') pintarPedidos(); }
+  else if(t.dataset.cerrar && e.target===t){ $('modal').innerHTML=''; pintarGrid(); }
+  else if(t.dataset.tog){ $('det'+t.dataset.tog).classList.toggle('oculto'); }
+  else if(t.dataset.repetir){ const p=S.pedidos[t.dataset.repetir]; const ids=new Set(S.data.productos.map(x=>x.id));
+    p.Detalle.forEach(l=>{ if(ids.has(l.id)) S.carrito[l.id]=(S.carrito[l.id]||0)+l.cantidad; }); setCant('_',0);
+    document.querySelector('[data-tab=cat]').click(); pintarGrid(); U.toast('Productos agregados al pedido'); }
+});
+document.addEventListener('change', e=>{ if(e.target.dataset.cant){ setCant(e.target.dataset.cant, e.target.value); refrescar(); } });
+function refrescar(){ if($('modal').innerHTML){ if(totalCarrito().n) abrirCarrito(); else $('modal').innerHTML=''; } pintarGrid(); }
+$('q').oninput = e => { S.q=e.target.value; pintarGrid(); };
+$('bVerCarrito').onclick = abrirCarrito;
+$('bEntrar').onclick = () => { const c=$('codigo').value.trim(); if(c) entrar(c); };
+$('codigo').onkeydown = e => { if(e.key==='Enter') $('bEntrar').click(); };
+$('bSalir').onclick = () => { localStorage.removeItem(LS_COD); location.href = location.pathname + (DEMO && new URLSearchParams(location.search).get('demo')?'?demo=1':''); };
+
+/* ---------- inicio ---------- */
+(async()=>{
+  const p = new URLSearchParams(location.search);
+  const cod = p.get('c') || localStorage.getItem(LS_COD);
+  if(cod) entrar(cod);
+  else { ver('vLogin'); try{ const i=await api('info'); $('lEmpresa').textContent=i.empresa; }catch(e){} }
+})();
+</script>
+</body>
+</html>

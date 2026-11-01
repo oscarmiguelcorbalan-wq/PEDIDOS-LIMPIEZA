@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0f2fe"/><stop offset="1" stop-color="#bae6fd"/></linearGradient></defs>
+<rect width="240" height="240" rx="28" fill="url(#bg)"/>
+<ellipse cx="120" cy="212" rx="70" ry="9" fill="#000" opacity=".10"/>
+
+<path d="M70 70 h70 q10 0 14 10 l12 26 q4 8 4 18 v74 q0 14 -14 14 h-96 q-14 0 -14 -14 v-92 q0 -36 24 -36z" fill="#ffffff" stroke="#94a3b8" stroke-width="3"/>
+<path d="M140 70 q30 0 30 30 v20 h-14 v-18 q0 -16 -16 -16z" fill="#ffffff" stroke="#94a3b8" stroke-width="3"/>
+<rect x="84" y="44" width="34" height="26" rx="5" fill="#2563eb"/>
+<rect x="80" y="64" width="42" height="9" rx="3" fill="#1d4ed8"/>
+<rect x="64" y="122" width="96" height="62" rx="8" fill="#2563eb"/>
+<path d="M112 132 q-14 18 -14 26 a14 14 0 0 0 28 0 q0 -8 -14 -26z" fill="#fff"/>
+<text x="112" y="178" font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">LAVANDINA</text>
+</svg>

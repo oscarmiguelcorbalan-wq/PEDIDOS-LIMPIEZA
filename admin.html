@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#155e75">
+<title>Gestión · Pedidos limpieza</title>
+<link rel="stylesheet" href="estilos.css">
+<style>
+  body{display:flex;min-height:100vh;flex-direction:column}
+  .app{display:flex;flex:1;min-height:0}
+  nav{width:220px;background:#0f172a;color:#cbd5e1;padding:16px 10px;flex-shrink:0;display:flex;flex-direction:column;gap:2px}
+  nav .marca{color:#fff;font-weight:800;font-size:16px;padding:4px 10px 16px}
+  nav button{background:none;border:0;color:inherit;text-align:left;padding:10px 12px;border-radius:9px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:500}
+  nav button:hover{background:#1e293b}
+  nav button.on{background:var(--pri);color:#fff}
+  nav .badge{background:var(--acc);color:#111;border-radius:999px;font-size:11px;padding:1px 7px;font-weight:800}
+  nav .pie{margin-top:auto;font-size:12px;padding:10px;color:#64748b}
+  main{flex:1;padding:22px;overflow:auto;min-width:0}
+  main h2{margin:0 0 14px;font-size:22px}
+  .barra-sup{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .barra-sup .esp{flex:1}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+  .kpi{padding:14px}.kpi b{display:block;font-size:24px}.kpi span{font-size:12px;color:var(--tx2)}
+  .tabla{overflow:auto}
+  .tabla td input,.tabla td select{padding:6px 8px;border-radius:8px;min-width:70px}
+  .mini{width:40px;height:40px;border-radius:8px;object-fit:cover;background:#f1f5f9}
+  .pedido{padding:14px;margin-bottom:10px}
+  .pedido .cab{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .pedido .cab .q{flex:1;min-width:160px}
+  .pedido .det{margin-top:10px;display:none}
+  .pedido.abierto .det{display:block}
+  .filtros{display:flex;gap:6px;flex-wrap:wrap}
+  .filtros button{border:1.5px solid var(--borde);background:#fff;border-radius:999px;padding:5px 11px;cursor:pointer;font-size:13px}
+  .filtros button.on{background:var(--tx);color:#fff;border-color:var(--tx)}
+  .stock-bajo td{background:#fff7ed}.stock-cero td{background:#fef2f2}
+  .presu{display:grid;grid-template-columns:1fr 360px;gap:16px;align-items:start}
+  .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+  .pp{padding:8px;text-align:center;cursor:pointer;user-select:none;position:relative}
+  .pp img{width:100%;aspect-ratio:1;border-radius:10px}
+  .pp b{display:block;font-size:13px;margin-top:4px}
+  .pp .q{position:absolute;top:6px;right:6px;background:var(--pri);color:#fff;border-radius:999px;min-width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .pp.sel{outline:2.5px solid var(--pri)}
+  .resumen{padding:16px;position:sticky;top:10px}
+  .resumen .l{display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--borde);font-size:14px}
+  .resumen .l span{flex:1}
+  .resumen .l input{width:58px;padding:4px 6px;text-align:center}
+  .tot{display:flex;justify-content:space-between;font-weight:800;font-size:20px;margin:10px 0}
+  .login{max-width:340px;margin:12vh auto;padding:26px;text-align:center}
+  .menu-movil{display:none}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:860px){
+    nav{position:fixed;inset:0 auto 0 0;z-index:40;transform:translateX(-100%);transition:.2s}
+    nav.abierto{transform:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.4)}
+    .menu-movil{display:flex;background:#0f172a;color:#fff;padding:10px 14px;align-items:center;gap:10px}
+    .menu-movil button{background:none;border:0;color:#fff;font-size:22px}
+    main{padding:14px}
+    .presu{grid-template-columns:1fr}
+  }
+  /* impresión de presupuesto */
+  #impresion{display:none}
+  @media print{
+    body>*:not(#impresion){display:none!important}
+    #impresion{display:block;padding:10mm;font-size:12pt;color:#000}
+    #impresion table th{background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+  #impresion .cabp{display:flex;justify-content:space-between;border-bottom:3px solid var(--pri);padding-bottom:8px;margin-bottom:14px}
+  #impresion h1{margin:0;color:var(--pri);font-size:22pt}
+</style>
+</head>
+<body>
+
+<section id="vLogin" class="oculto">
+  <div class="login card">
+    <h2 style="margin-top:0">Gestión de pedidos</h2>
+    <p class="muted">Ingresá tu PIN de administrador</p>
+    <div class="campo"><input id="pin" type="password" inputmode="numeric" placeholder="PIN" style="text-align:center;font-size:20px;letter-spacing:4px"></div>
+    <button class="btn grande" id="bLogin">Entrar</button>
+    <p id="lErr" style="color:var(--mal)"></p>
+    <p class="muted" id="pistaDemo"></p>
+  </div>
+</section>
+
+<div id="vApp" class="oculto" style="display:flex;flex-direction:column;flex:1">
+  <div class="menu-movil"><button id="bMenu">☰</button><b id="mTitulo">Gestión</b></div>
+  <div class="app">
+    <nav id="nav">
+      <div class="marca" id="nEmpresa">Gestión</div>
+      <button data-sec="pedidos" class="on">📥 Pedidos <span class="badge" id="nNuevos"></span></button>
+      <button data-sec="stock">📦 Stock <span class="badge" id="nBajos"></span></button>
+      <button data-sec="productos">🏷️ Productos y tarifas</button>
+      <button data-sec="ofertas">🔥 Ofertas</button>
+      <button data-sec="clientes">👥 Clientes</button>
+      <button data-sec="presupuestos">🧾 Presupuestos</button>
+      <button data-sec="ajustes">⚙️ Ajustes</button>
+      <div class="pie"><a href="#" id="bRefrescar" style="color:#94a3b8">↻ Actualizar datos</a><br><a href="#" id="bSalir" style="color:#94a3b8">Salir</a></div>
+    </nav>
+    <main id="main"></main>
+  </div>
+</div>
+
+<div id="vCarga" class="cargando"><div class="spin"></div>Cargando…</div>
+<div id="modal"></div>
+<div id="impresion"></div>
+
+<script src="config.js"></script>
+<script src="comun.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const S = { pin: sessionStorage.getItem('pl_pin') || '', d: null, sec: 'pedidos', filtro: 'Activos', presu: { lineas: {}, cliente: '', tarifa: 'General', extra: 0, notas: '' } };
+const M = () => S.d.config.Moneda || '$';
+const din = n => U.dinero(n, M());
+function ver(v){ ['vLogin','vApp','vCarga'].forEach(x=>$(x).classList.toggle('oculto',x!==v)); }
+
+async function A(accion, datos){ return api(accion, Object.assign({pin:S.pin}, datos||{})); }
+
+async function cargar(silencioso){
+  if(!silencioso) ver('vCarga');
+  try{
+    S.d = await A('todo');
+    sessionStorage.setItem('pl_pin', S.pin);
+    $('nEmpresa').textContent = S.d.config.Empresa || 'Gestión';
+    ver('vApp'); badges(); pintar();
+  }catch(e){
+    if(/PIN/.test(e.message)){ sessionStorage.removeItem('pl_pin'); ver('vLogin'); $('lErr').textContent=e.message; }
+    else { U.toast(e.message,'error'); if(!S.d) { ver('vLogin'); $('lErr').textContent=e.message; } }
+  }
+}
+function badges(){
+  const n = S.d.pedidos.filter(p=>p.Estado==='Nuevo').length;
+  const b = S.d.productos.filter(p=>U.si(p.Activo) && Number(p.Stock)<=Number(p['Stock mínimo'])).length;
+  $('nNuevos').textContent = n||''; $('nNuevos').classList.toggle('oculto',!n);
+  $('nBajos').textContent = b||''; $('nBajos').classList.toggle('oculto',!b);
+}
+async function hacer(accion, datos, msg){
+  try{ const r = await A(accion, datos); if(msg) U.toast(msg); await cargar(true); return r; }
+  catch(e){ U.toast(e.message,'error'); throw e; }
+}
+function prod(id){ return S.d.productos.find(p=>p.ID===id) || {}; }
+function cerrarModal(){ $('modal').innerHTML=''; }
+function modal(html){ $('modal').innerHTML = `<div class="modal-fondo" id="mf"><div class="modal">${html}</div></div>`; $('mf').onclick=e=>{ if(e.target.id==='mf') cerrarModal(); }; }
+
+function pintar(){
+  document.querySelectorAll('nav [data-sec]').forEach(b=>b.classList.toggle('on',b.dataset.sec===S.sec));
+  $('mTitulo').textContent = document.querySelector(`nav [data-sec=${S.sec}]`).textContent.replace(/\d+$/,'').trim();
+  ({pedidos:vPedidos, stock:vStock, productos:vProductos, ofertas:vOfertas, clientes:vClientes, presupuestos:vPresupuestos, ajustes:vAjustes})[S.sec]();
+}
+
+/* ====================== PEDIDOS ====================== */
+function vPedidos(){
+  const ps = S.d.pedidos; const hoy = new Date().toISOString().slice(0,10);
+  const activos = ps.filter(p=>!['Entregado','Cancelado'].includes(p.Estado));
+  const mes = new Date().toISOString().slice(0,7);
+  const ventasMes = ps.filter(p=>String(p.Fecha).slice(0,7)===mes && p.Estado!=='Cancelado').reduce((s,p)=>s+Number(p.Total),0);
+  const filtros = ['Activos', ...S.d.estados, 'Todos'];
+  const lista = ps.filter(p => S.filtro==='Todos' || (S.filtro==='Activos' ? !['Entregado','Cancelado'].includes(p.Estado) : p.Estado===S.filtro));
+  $('main').innerHTML = `<h2>Pedidos</h2>
+  <div class="kpis">
+    <div class="kpi card"><b>${ps.filter(p=>p.Estado==='Nuevo').length}</b><span>Nuevos sin confirmar</span></div>
+    <div class="kpi card"><b>${activos.length}</b><span>En curso</span></div>
+    <div class="kpi card"><b>${ps.filter(p=>String(p.Fecha).slice(0,10)===hoy).length}</b><span>Recibidos hoy</span></div>
+    <div class="kpi card"><b>${din(ventasMes)}</b><span>Vendido este mes</span></div>
+  </div>
+  <div class="barra-sup"><div class="filtros">${filtros.map(f=>`<button class="${f===S.filtro?'on':''}" data-filtro="${f}">${f}</button>`).join('')}</div></div>
+  ${lista.length ? lista.map(pedidoHTML).join('') : '<div class="card cargando">No hay pedidos en esta vista.</div>'}`;
+}
+function pedidoHTML(p){
+  const cli = S.d.clientes.find(c=>c.ID===p['Cliente ID'])||{};
+  const txt = `Hola ${cli.Contacto||p.Cliente}! Tu pedido ${p.ID} está *${p.Estado}*.\n` + p.Detalle.map(l=>`• ${l.cantidad} × ${l.nombre}`).join('\n') + `\nTotal: ${din(p.Total)}`;
+  return `<div class="pedido card" id="p_${p.ID}">
+    <div class="cab">
+      <div class="q" style="cursor:pointer" data-abrir="${p.ID}"><b>${U.esc(p.ID)}</b> · ${U.esc(p.Cliente)}<div class="muted">${U.fecha(p.Fecha,true)} · ${p.Detalle.length} productos</div></div>
+      <b style="font-size:17px">${din(p.Total)}</b>
+      <select data-estado="${p.ID}" style="width:auto">${S.d.estados.map(e=>`<option ${e===p.Estado?'selected':''}>${e}</option>`).join('')}</select>
+      <span class="chip ${p.Estado}">${p.Estado}</span>
+    </div>
+    <div class="det">
+      <div class="tabla"><table><tr><th>Producto</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Subtotal</th><th>Stock</th></tr>
+      ${p.Detalle.map(l=>{ const s=Number(prod(l.id).Stock); return `<tr><td>${U.esc(l.nombre)} ${l.oferta?'<span class="chip oferta">oferta</span>':''}</td><td class="num">${l.cantidad}</td><td class="num">${din(l.precio)}</td><td class="num">${din(l.subtotal)}</td><td>${p['Stock descontado']==='SI'?'<span class="muted">descontado</span>':(s<l.cantidad?`<span class="chip sin">hay ${s}</span>`:`<span class="muted">hay ${s}</span>`)}</td></tr>`; }).join('')}
+      <tr><td colspan="3"><b>Total</b></td><td class="num"><b>${din(p.Total)}</b></td><td></td></tr></table></div>
+      ${p['Notas cliente']?`<p><b>Notas del cliente:</b> ${U.esc(p['Notas cliente'])}</p>`:''}
+      <div class="campo" style="margin-top:10px"><label>Notas internas</label><input data-notas="${p.ID}" value="${U.esc(p['Notas internas']||'')}" placeholder="Solo las ves vos"></div>
+      <div class="fila" style="justify-content:flex-start;gap:8px">
+        ${p.Estado==='Nuevo'?`<button class="btn peq" style="flex:0 0 auto" data-confirmar="${p.ID}">✓ Confirmar (descuenta stock)</button>`:''}
+        ${cli['Teléfono']?`<a class="btn wa peq" style="flex:0 0 auto" target="_blank" href="${U.wa(cli['Teléfono'],txt)}">WhatsApp al cliente</a>`:''}
+        <button class="btn gris peq" style="flex:0 0 auto" data-imprimir-ped="${p.ID}">Imprimir remito</button>
+      </div>
+    </div></div>`;
+}
+
+/* ====================== STOCK ====================== */
+function vStock(){
+  const ps = S.d.productos;
+  const valor = ps.reduce((s,p)=>s+Number(p.Stock)*Number(p.Precio),0);
+  $('main').innerHTML = `<h2>Stock</h2>
+  <div class="kpis">
+    <div class="kpi card"><b>${ps.filter(p=>Number(p.Stock)<=0).length}</b><span>Sin stock</span></div>
+    <div class="kpi card"><b>${ps.filter(p=>Number(p.Stock)>0&&Number(p.Stock)<=Number(p['Stock mínimo'])).length}</b><span>Por debajo del mínimo</span></div>
+    <div class="kpi card"><b>${din(valor)}</b><span>Valor del stock (a precio lista)</span></div>
+    <div class="kpi card"><b>${S.d.pedidos.filter(p=>p.Estado==='Nuevo').reduce((s,p)=>s+p.Detalle.length,0)}</b><span>Líneas en pedidos sin confirmar</span></div>
+  </div>
+  <div class="card tabla"><table><tr><th></th><th>Producto</th><th class="num">Stock</th><th class="num">Mínimo</th><th class="num">Reservado*</th><th></th></tr>
+  ${ps.map(p=>{ const s=Number(p.Stock), mn=Number(p['Stock mínimo']);
+    const res = S.d.pedidos.filter(x=>x.Estado==='Nuevo').reduce((a,x)=>a+x.Detalle.filter(l=>l.id===p.ID).reduce((b,l)=>b+l.cantidad,0),0);
+    return `<tr class="${s<=0?'stock-cero':s<=mn?'stock-bajo':''}"><td><img class="mini" src="${U.esc(U.img(p.Imagen))}"></td><td><b>${U.esc(p.Producto)}</b><div class="muted">${U.esc(p.Unidad)}</div></td>
+    <td class="num"><b style="font-size:17px">${s}</b></td><td class="num">${mn}</td><td class="num">${res||''}</td>
+    <td style="white-space:nowrap"><button class="btn peq" data-mov="${p.ID}" data-tipo="Entrada">+ Entrada</button> <button class="btn gris peq" data-mov="${p.ID}" data-tipo="Salida">− Salida</button> <button class="btn sec peq" data-mov="${p.ID}" data-tipo="Recuento">Recuento</button></td></tr>`; }).join('')}
+  </table></div>
+  <p class="muted">* Reservado = unidades en pedidos “Nuevo” todavía no confirmados. El stock se descuenta al pasar un pedido a Confirmado y se devuelve si lo cancelás.</p>
+  <h3>Últimos movimientos</h3>
+  <div class="card tabla"><table><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th class="num">Cant.</th><th class="num">Queda</th><th>Motivo</th></tr>
+  ${S.d.movimientos.slice(0,60).map(m=>`<tr><td>${U.fecha(m.Fecha,true)}</td><td>${U.esc(m.Producto)}</td><td>${U.esc(m.Tipo)}</td><td class="num" style="color:${m.Cantidad<0?'var(--mal)':'var(--ok)'}">${m.Cantidad>0?'+':''}${m.Cantidad}</td><td class="num">${m['Stock resultante']}</td><td class="muted">${U.esc(m.Motivo)}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Sin movimientos todavía</td></tr>'}
+  </table></div>`;
+}
+function modalMov(id, tipo){
+  const p = prod(id);
+  modal(`<h3>${tipo} · ${U.esc(p.Producto)}</h3><p class="muted">Stock actual: <b>${p.Stock}</b></p>
+  <div class="campo"><label>${tipo==='Recuento'?'Cantidad contada (queda así)':'Cantidad'}</label><input id="mCant" type="number" min="0" inputmode="numeric" autofocus></div>
+  <div class="campo"><label>Motivo</label><input id="mMot" placeholder="${tipo==='Entrada'?'Compra a proveedor, remito nº…':tipo==='Salida'?'Rotura, uso interno…':'Inventario'}"></div>
+  <div class="fila"><button class="btn gris" onclick="cerrarModal()">Cancelar</button><button class="btn" id="mOk">Guardar</button></div>`);
+  $('mCant').focus();
+  $('mOk').onclick = async()=>{ let c=Number($('mCant').value); if(isNaN(c)||$('mCant').value==='') return U.toast('Poné una cantidad','error');
+    if(tipo==='Salida') c=-Math.abs(c); $('mOk').disabled=true;
+    try{ await hacer('ajustarStock',{id, cantidad:c, tipo, motivo:$('mMot').value},'Stock actualizado'); cerrarModal(); }catch(e){ $('mOk').disabled=false; } };
+}
+
+/* ====================== PRODUCTOS Y TARIFAS ====================== */
+function vProductos(){
+  const ts = S.d.tarifas;
+  $('main').innerHTML = `<h2>Productos y tarifas</h2>
+  <div class="barra-sup"><span class="muted">Tocá un producto para editarlo (nombre, precio, foto…).</span><span class="esp"></span><button class="btn" data-editprod="">+ Nuevo producto</button></div>
+  <div class="card tabla"><table><tr><th></th><th>Producto</th><th>Categoría</th><th class="num">Precio lista</th>${ts.map(t=>`<th class="num">${U.esc(t.Tarifa)}<br><span style="text-transform:none">−${t['Descuento %']}%</span></th>`).join('')}<th>Activo</th></tr>
+  ${S.d.productos.map(p=>`<tr style="cursor:pointer" data-editprod="${p.ID}"><td><img class="mini" src="${U.esc(U.img(p.Imagen))}"></td><td><b>${U.esc(p.Producto)}</b><div class="muted">${U.esc(p.ID)} · ${U.esc(p.Unidad)}</div></td><td>${U.esc(p['Categoría'])}</td>
+  <td class="num"><b>${din(p.Precio)}</b></td>${ts.map(t=>`<td class="num">${din(U.r2(p.Precio*(1-t['Descuento %']/100)))}</td>`).join('')}<td>${U.si(p.Activo)?'✅':'—'}</td></tr>`).join('')}
+  </table></div>
+  <div class="barra-sup" style="margin-top:22px"><h3 style="margin:0">Tarifas</h3><span class="esp"></span><button class="btn sec peq" data-subir>% Subir/bajar precios</button><button class="btn peq" data-edittarifa="">+ Nueva tarifa</button></div>
+  <p class="muted" style="margin-top:-6px">Cada cliente tiene una tarifa. La tarifa aplica un % de descuento sobre el precio de lista.</p>
+  <div class="card tabla"><table><tr><th>Tarifa</th><th class="num">Descuento</th><th>Notas</th><th class="num">Clientes</th><th></th></tr>
+  ${ts.map(t=>`<tr><td><b>${U.esc(t.Tarifa)}</b></td><td class="num">${t['Descuento %']}%</td><td class="muted">${U.esc(t.Notas||'')}</td><td class="num">${S.d.clientes.filter(c=>c.Tarifa===t.Tarifa).length}</td><td style="text-align:right"><button class="btn gris peq" data-edittarifa="${U.esc(t.Tarifa)}">Editar</button></td></tr>`).join('')}
+  </table></div>`;
+}
+function modalProd(id){
+  const p = id ? prod(id) : { Activo:'SI', Stock:0, 'Stock mínimo':0, Imagen:'' };
+  const cats = [...new Set(S.d.productos.map(x=>x['Categoría']).filter(Boolean))];
+  modal(`<h3>${id?'Editar':'Nuevo'} producto</h3>
+  <div class="fila" style="align-items:flex-start"><img id="fImgPrev" src="${U.esc(U.img(p.Imagen))}" style="flex:0 0 90px;width:90px;height:90px;border-radius:12px">
+  <div><div class="campo"><label>Nombre</label><input id="fNom" value="${U.esc(p.Producto||'')}"></div>
+  <div class="campo"><label>Unidad / presentación</label><input id="fUni" value="${U.esc(p.Unidad||'')}" placeholder="Bidón 5 L, Unidad, Pack x10…"></div></div></div>
+  <div class="campo"><label>Descripción</label><input id="fDesc" value="${U.esc(p['Descripción']||'')}"></div>
+  <div class="grid2"><div class="campo"><label>Categoría</label><input id="fCat" list="lcats" value="${U.esc(p['Categoría']||'')}"><datalist id="lcats">${cats.map(c=>`<option>${U.esc(c)}</option>`).join('')}</datalist></div>
+  <div class="campo"><label>Precio de lista</label><input id="fPre" type="number" step="0.01" value="${p.Precio??''}"></div>
+  ${id?'':`<div class="campo"><label>Stock inicial</label><input id="fSto" type="number" value="0"></div>`}
+  <div class="campo"><label>Stock mínimo (alerta)</label><input id="fMin" type="number" value="${p['Stock mínimo']??0}"></div></div>
+  <div class="campo"><label>Imagen (ruta img/… o enlace a una foto)</label><input id="fImg" value="${U.esc(p.Imagen||'')}" placeholder="https://…/foto.jpg"></div>
+  <div class="campo"><label><input type="checkbox" id="fAct" style="width:auto" ${U.si(p.Activo)?'checked':''}> Visible para los clientes</label></div>
+  <div class="fila"><button class="btn gris" onclick="cerrarModal()">Cancelar</button><button class="btn" id="fOk">Guardar</button></div>`);
+  $('fImg').oninput = e => $('fImgPrev').src = U.img(e.target.value);
+  $('fOk').onclick = async()=>{
+    if(!$('fNom').value.trim()) return U.toast('Falta el nombre','error');
+    const item = { Producto:$('fNom').value.trim(), Unidad:$('fUni').value, 'Descripción':$('fDesc').value, 'Categoría':$('fCat').value, Precio:Number($('fPre').value)||0,
+      'Stock mínimo':Number($('fMin').value)||0, Imagen:$('fImg').value.trim(), Activo:$('fAct').checked?'SI':'NO' };
+    if(id) item.ID=id; else item.Stock=Number($('fSto').value)||0;
+    $('fOk').disabled=true; try{ await hacer('guardarProducto',{item},'Producto guardado'); cerrarModal(); }catch(e){ $('fOk').disabled=false; }
+  };
+}
+function modalTarifa(nombre){
+  const t = nombre ? S.d.tarifas.find(x=>x.Tarifa===nombre) : {};
+  modal(`<h3>${nombre?'Editar':'Nueva'} tarifa</h3>
+  <div class="campo"><label>Nombre</label><input id="tNom" value="${U.esc(t.Tarifa||'')}" ${nombre?'disabled':''}></div>
+  <div class="campo"><label>Descuento sobre precio de lista (%)</label><input id="tDes" type="number" step="0.5" value="${t['Descuento %']??0}"></div>
+  <div class="campo"><label>Notas</label><input id="tNot" value="${U.esc(t.Notas||'')}"></div>
+  <div class="fila">${nombre?'<button class="btn rojo" id="tDel">Borrar</button>':''}<button class="btn gris" onclick="cerrarModal()">Cancelar</button><button class="btn" id="tOk">Guardar</button></div>`);
+  $('tOk').onclick = async()=>{ const n=$('tNom').value.trim(); if(!n) return U.toast('Falta el nombre','error');
+    await hacer('guardarTarifa',{item:{Tarifa:n,'Descuento %':Number($('tDes').value)||0,Notas:$('tNot').value}},'Tarifa guardada'); cerrarModal(); };
+  if(nombre) $('tDel').onclick = async()=>{ if(S.d.clientes.some(c=>c.Tarifa===nombre)) return U.toast('Hay clientes con esta tarifa; cambialos primero','error');
+    if(confirm('¿Borrar la tarifa '+nombre+'?')){ await hacer('borrarTarifa',{id:nombre},'Tarifa borrada'); cerrarModal(); } };
+}
+function modalSubir(){
+  modal(`<h3>Actualizar precios de lista</h3><p class="muted">Aplica un % a todos los productos (o a una categoría). Usá negativo para bajar.</p>
+  <div class="grid2"><div class="campo"><label>Porcentaje</label><input id="sPct" type="number" step="0.5" placeholder="Ej: 8"></div>
+  <div class="campo"><label>Categoría</label><select id="sCat"><option value="">Todas</option>${[...new Set(S.d.productos.map(p=>p['Categoría']))].map(c=>`<option>${U.esc(c)}</option>`).join('')}</select></div></div>
+  <div class="campo"><label>Redondear a</label><select id="sRed"><option value="1">1</option><option value="10" selected>10</option><option value="50">50</option><option value="100">100</option><option value="0.01">sin redondeo</option></select></div>
+  <div class="fila"><button class="btn gris" onclick="cerrarModal()">Cancelar</button><button class="btn" id="sOk">Aplicar</button></div>`);
+  $('sOk').onclick = async()=>{ const pct=Number($('sPct').value); if(!pct) return U.toast('Poné un porcentaje','error');
+    const cat=$('sCat').value, red=Number($('sRed').value); const lista=S.d.productos.filter(p=>!cat||p['Categoría']===cat);
+    if(!confirm(`¿Cambiar ${pct>0?'+':''}${pct}% el precio de ${lista.length} productos?`)) return;
+    $('sOk').disabled=true; $('sOk').textContent='Actualizando…';
+    try{ for(const p of lista){ await A('guardarProducto',{item:{ID:p.ID, Precio:Math.round(p.Precio*(1+pct/100)/red)*red}}); }
+      U.toast('Precios actualizados'); cerrarModal(); await cargar(true); }catch(e){ U.toast(e.message,'error'); }
+  };
+}
+
+/* ====================== OFERTAS ====================== */
+function vOfertas(){
+  const hoy = new Date().toISOString().slice(0,10);
+  const estado = o => !U.si(o.Activa) ? ['Pausada','Cancelado'] : (o.Hasta && String(o.Hasta).slice(0,10)<hoy) ? ['Vencida','Cancelado'] : (o.Desde && String(o.Desde).slice(0,10)>hoy) ? ['Programada','Preparado'] : ['Vigente','Entregado'];
+  $('main').innerHTML = `<h2>Ofertas</h2>
+  <div class="barra-sup"><span class="muted">Las ofertas vigentes se ven destacadas en la app de clientes. Si un cliente tiene una tarifa mejor, se le aplica el mejor precio.</span><span class="esp"></span><button class="btn" data-editof="">+ Nueva oferta</button></div>
+  <div class="card tabla"><table><tr><th></th><th>Oferta</th><th>Producto</th><th>Descuento</th><th class="num">Desde cant.</th><th>Vigencia</th><th>Estado</th><th></th></tr>
+  ${S.d.ofertas.map(o=>{ const p=prod(o['Producto ID']); const e=estado(o); return `<tr><td><img class="mini" src="${U.esc(U.img(p.Imagen))}"></td><td><b>${U.esc(o['Título'])}</b></td><td>${U.esc(p.Producto||o['Producto ID'])}</td>
+  <td>${String(o.Tipo).toUpperCase().startsWith('PRECIO')?'Precio '+din(o.Valor):o.Valor+'%'}</td><td class="num">${o['Cantidad mínima']||1}</td>
+  <td class="muted">${o.Desde?U.fecha(o.Desde):'—'} → ${o.Hasta?U.fecha(o.Hasta):'sin fin'}</td><td><span class="chip ${e[1]}">${e[0]}</span></td>
+  <td style="white-space:nowrap;text-align:right"><button class="btn gris peq" data-editof="${o.ID}">Editar</button></td></tr>`; }).join('') || '<tr><td colspan="8" class="muted">No hay ofertas cargadas</td></tr>'}
+  </table></div>`;
+}
+function modalOferta(id){
+  const hoy = new Date().toISOString().slice(0,10);
+  const o = id ? S.d.ofertas.find(x=>x.ID===id) : { Tipo:'PORCENTAJE', 'Cantidad mínima':1, Desde:hoy, Activa:'SI' };
+  modal(`<h3>${id?'Editar':'Nueva'} oferta</h3>
+  <div class="campo"><label>Producto</label><select id="oPro">${S.d.productos.map(p=>`<option value="${p.ID}" ${p.ID===o['Producto ID']?'selected':''}>${U.esc(p.Producto)} (${din(p.Precio)})</option>`).join('')}</select></div>
+  <div class="campo"><label>Título que ve el cliente</label><input id="oTit" value="${U.esc(o['Título']||'')}" placeholder="Ej: Detergente 20% off por cantidad"></div>
+  <div class="grid2"><div class="campo"><label>Tipo</label><select id="oTip"><option value="PORCENTAJE" ${!String(o.Tipo).toUpperCase().startsWith('PRECIO')?'selected':''}>% de descuento</option><option value="PRECIO" ${String(o.Tipo).toUpperCase().startsWith('PRECIO')?'selected':''}>Precio fijo</option></select></div>
+  <div class="campo"><label>Valor</label><input id="oVal" type="number" step="0.01" value="${o.Valor??''}"></div>
+  <div class="campo"><label>A partir de (unidades)</label><input id="oMin" type="number" min="1" value="${o['Cantidad mínima']||1}"></div><div></div>
+  <div class="campo"><label>Desde</label><input id="oDes" type="date" value="${String(o.Desde||'').slice(0,10)}"></div>
+  <div class="campo"><label>Hasta</label><input id="oHas" type="date" value="${String(o.Hasta||'').slice(0,10)}"></div></div>
+  <div class="campo"><label><input type="checkbox" id="oAct" style="width:auto" ${U.si(o.Activa)?'checked':''}> Activa</label></div>
+  <div class="fila">${id?'<button class="btn rojo" id="oDel">Borrar</button>':''}<button class="btn gris" onclick="cerrarModal()">Cancelar</button><button class="btn" id="oOk">Guardar</button></div>`);
+  $('oOk').onclick = async()=>{ if(!$('oVal').value) return U.toast('Falta el valor','error');
+    const p = prod($('oPro').value);
+    const item = { 'Producto ID':$('oPro').value, 'Título':$('oTit').value || (p.Producto+' en oferta'), Tipo:$('oTip').value, Valor:Number($('oVal').value),
+      'Cantidad mínima':Number($('oMin').value)||1, Desde:$('oDes').value, Hasta:$('oHas').value, Activa:$('oAct').checked?'SI':'NO' };
+    if(id) item.ID=id; await hacer('guardarOferta',{item},'Oferta guardada'); cerrarModal(); };
+  if(id) $('oDel').onclick = async()=>{ if(confirm('¿Borrar esta oferta?')){ await hacer('borrarOferta',{id},'Oferta borrada'); cerrarModal(); } };
+}
+
+/* ====================== CLIENTES ====================== */
+function urlCliente(c){ return location.href.replace(/admin\.html.*$/,'').replace(/[?#].*$/,'') + 'index.html?c=' + encodeURIComponent(c['Código acceso']); }
+function vClientes(){
+  $('main').innerHTML = `<h2>Clientes</h2>
+  <div class="barra-sup"><span class="muted">Cada cliente entra a la app con su enlace personal (lleva su código). Mandáselo por WhatsApp.</span><span class="esp"></span><button class="btn" data-editcli="">+ Nuevo cliente</button></div>
+  <div class="card tabla"><table><tr><th>Cliente</th><th>Teléfono</th><th>Tarifa</th><th>Código</th><th class="num">Pedidos</th><th class="num">Comprado</th><th></th></tr>
+  ${S.d.clientes.map(c=>{ const ps=S.d.pedidos.filter(p=>p['Cliente ID']===c.ID&&p.Estado!=='Cancelado');
+    const txt=`Hola ${c.Contacto||c.Nombre}! Desde ahora podés hacer tus pedidos acá: ${urlCliente(c)}`;
+    return `<tr style="${U.si(c.Activo)?'':'opacity:.5'}"><td><b>${U.esc(c.Nombre)}</b><div class="muted">${U.esc(c.Contacto||'')} ${c['Dirección']?'· '+U.esc(c['Dirección']):''}</div></td><td>${U.esc(c['Teléfono']||'')}</td>
+    <td><span class="chip">${U.esc(c.Tarifa)}</span></td><td><code>${U.esc(c['Código acceso'])}</code></td><td class="num">${ps.length}</td><td class="num">${din(ps.reduce((s,p)=>s+Number(p.Total),0))}</td>
+    <td style="white-space:nowrap;text-align:right"><button class="btn sec peq" data-copiar="${U.esc(urlCliente(c))}">Copiar enlace</button>
+    ${c['Teléfono']?`<a class="btn wa peq" target="_blank" href="${U.wa(c['Teléfono'],txt)}">Enviar</a>`:''}
+    <button class="btn gris peq" data-editcli="${c.ID}">Editar</button></td></tr>`; }).join('')}
+  </table></div>`;
+}
+function modalCliente(id){
+  const c = id ? S.d.clientes.find(x=>x.ID===id) : { Tarifa:'General', Activo:'SI' };
+  modal(`<h3>${id?'Editar':'Nuevo'} cliente</h3>
+  <div class="campo"><label>Nombre / comercio</label><input id="cNom" value="${U.esc(c.Nombre||'')}"></div>
+  <div class="grid2"><div class="campo"><label>Persona de contacto</label><input id="cCon" value="${U.esc(c.Contacto||'')}"></div>
+  <div class="campo"><label>Teléfono (WhatsApp, con código país)</label><input id="cTel" value="${U.esc(c['Teléfono']||'')}" placeholder="549381…"></div>
+  <div class="campo"><label>Email</label><input id="cEm" value="${U.esc(c.Email||'')}"></div>
+  <div class="campo"><label>Tarifa</label><select id="cTar">${S.d.tarifas.map(t=>`<option ${t.Tarifa===c.Tarifa?'selected':''}>${U.esc(t.Tarifa)}</option>`).join('')}</select></div></div>
+  <div class="campo"><label>Dirección de entrega</label><input id="cDir" value="${U.esc(c['Dirección']||'')}"></div>
+  <div class="campo"><label>Código de acceso (vacío = se genera solo)</label><input id="cCod" value="${U.esc(c['Código acceso']||'')}" style="text-transform:uppercase"></div>
+  <div class="campo"><label><input type="checkbox" id="cAct" style="width:auto" ${U.si(c.Activo)?'checked':''}> Puede hacer pedidos</label></div>
+  <div class="fila"><button class="btn gris" onclick="cerrarModal()">Cancelar</button><button class="btn" id="cOk">Guardar</button></div>`);
+  $('cOk').onclick = async()=>{ if(!$('cNom').value.trim()) return U.toast('Falta el nombre','error');
+    const item={Nombre:$('cNom').value.trim(),Contacto:$('cCon').value,'Teléfono':$('cTel').value.replace(/\s/g,''),Email:$('cEm').value,Tarifa:$('cTar').value,'Dirección':$('cDir').value,'Código acceso':$('cCod').value.trim().toUpperCase(),Activo:$('cAct').checked?'SI':'NO'};
+    if(id) item.ID=id; $('cOk').disabled=true; try{ await hacer('guardarCliente',{item},'Cliente guardado'); cerrarModal(); }catch(e){ $('cOk').disabled=false; } };
+}
+
+/* ====================== PRESUPUESTOS ====================== */
+function precioPresu(p, cant){
+  const t = S.d.tarifas.find(x=>x.Tarifa===S.presu.tarifa); const d = t?Number(t['Descuento %']):0;
+  const hoy = new Date().toISOString().slice(0,10); let mejor=U.r2(p.Precio*(1-d/100)), of=null;
+  S.d.ofertas.filter(o=>o['Producto ID']===p.ID && U.si(o.Activa) && (!o.Desde||String(o.Desde).slice(0,10)<=hoy) && (!o.Hasta||String(o.Hasta).slice(0,10)>=hoy)).forEach(o=>{
+    if(cant < (Number(o['Cantidad mínima'])||1)) return;
+    const v = String(o.Tipo).toUpperCase().startsWith('PRECIO') ? Number(o.Valor) : U.r2(p.Precio*(1-o.Valor/100)); if(v<mejor){mejor=v;of=o['Título'];} });
+  return {precio:mejor, oferta:of};
+}
+function vPresupuestos(){
+  const P=S.presu;
+  $('main').innerHTML = `<h2>Presupuesto rápido</h2>
+  <div class="presu">
+    <div>
+      <p class="muted" style="margin-top:0">Tocá un producto para sumar 1 (clic derecho o mantener para restar).</p>
+      <div class="pgrid">${S.d.productos.filter(p=>U.si(p.Activo)).map(p=>{ const q=P.lineas[p.ID]||0;
+        return `<div class="pp card ${q?'sel':''}" data-pp="${p.ID}">${q?`<span class="q">${q}</span>`:''}<img src="${U.esc(U.img(p.Imagen))}"><b>${U.esc(p.Producto)}</b><span class="muted">${din(precioPresu(p,Math.max(q,1)).precio)}</span></div>`; }).join('')}</div>
+    </div>
+    <div class="resumen card">
+      <div class="campo"><label>Cliente</label><input id="prCli" list="lcli" value="${U.esc(P.cliente)}" placeholder="Elegí o escribí un nombre"><datalist id="lcli">${S.d.clientes.map(c=>`<option>${U.esc(c.Nombre)}</option>`).join('')}</datalist></div>
+      <div class="grid2"><div class="campo"><label>Tarifa</label><select id="prTar">${S.d.tarifas.map(t=>`<option ${t.Tarifa===P.tarifa?'selected':''}>${U.esc(t.Tarifa)}</option>`).join('')}</select></div>
+      <div class="campo"><label>Desc. extra %</label><input id="prExt" type="number" step="0.5" value="${P.extra||''}"></div></div>
+      <div id="prLineas"></div>
+      <div class="campo" style="margin-top:10px"><label>Notas</label><input id="prNot" value="${U.esc(P.notas)}" placeholder="Forma de pago, plazo de entrega…"></div>
+      <div class="fila" style="flex-wrap:wrap"><button class="btn gris" id="prLimpiar">Limpiar</button><button class="btn" id="prGuardar">Guardar e imprimir</button></div>
+    </div>
+  </div>
+  <h3 style="margin-top:26px">Presupuestos guardados</h3>
+  <div class="card tabla"><table><tr><th>Nº</th><th>Fecha</th><th>Cliente</th><th class="num">Total</th><th>Válido hasta</th><th>Estado</th><th></th></tr>
+  ${S.d.presupuestos.map(p=>`<tr><td><b>${U.esc(p.ID)}</b></td><td>${U.fecha(p.Fecha)}</td><td>${U.esc(p.Cliente)}</td><td class="num">${din(p.Total)}</td><td>${U.fecha(p['Válido hasta'])}</td><td><span class="chip ${p.Estado==='Aceptado'?'Entregado':'Enviado'}">${U.esc(p.Estado)}</span></td>
+  <td style="white-space:nowrap;text-align:right"><button class="btn gris peq" data-reimp="${p.ID}">Imprimir</button> ${p.Estado!=='Aceptado'?`<button class="btn sec peq" data-apedido="${p.ID}">Pasar a pedido</button>`:''}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Todavía no hay presupuestos</td></tr>'}
+  </table></div>`;
+  pintarResumen();
+  $('prCli').oninput = e => { P.cliente=e.target.value; const c=S.d.clientes.find(x=>x.Nombre===P.cliente); if(c){ P.tarifa=c.Tarifa; $('prTar').value=c.Tarifa; vPresupuestosRefrescar(); } };
+  $('prTar').onchange = e => { P.tarifa=e.target.value; vPresupuestosRefrescar(); };
+  $('prExt').oninput = e => { P.extra=Number(e.target.value)||0; pintarResumen(); };
+  $('prNot').oninput = e => P.notas=e.target.value;
+  $('prLimpiar').onclick = () => { S.presu={lineas:{},cliente:'',tarifa:'General',extra:0,notas:''}; vPresupuestos(); };
+  $('prGuardar').onclick = guardarPresu;
+}
+function vPresupuestosRefrescar(){ const f=document.activeElement&&document.activeElement.id; vPresupuestos(); if(f&&$(f)){ $(f).focus(); } }
+function calcPresu(){
+  let sub=0; const ls=[];
+  S.d.productos.forEach(p=>{ const q=S.presu.lineas[p.ID]; if(q>0){ const u=precioPresu(p,q); const s=U.r2(u.precio*q); sub+=s; ls.push({p,q,u,s}); } });
+  sub=U.r2(sub); const tot=U.r2(sub*(1-(S.presu.extra||0)/100)); return {ls,sub,tot};
+}
+function pintarResumen(){
+  const {ls,sub,tot}=calcPresu();
+  $('prLineas').innerHTML = ls.length ? ls.map(({p,q,u,s})=>`<div class="l"><span>${U.esc(p.Producto)}${u.oferta?' 🔥':''}<br><small class="muted">${din(u.precio)} c/u</small></span><input type="number" min="0" data-prq="${p.ID}" value="${q}"><b style="min-width:80px;text-align:right">${din(s)}</b></div>`).join('')
+    + (S.presu.extra?`<div class="l"><span>Subtotal</span><b>${din(sub)}</b></div><div class="l"><span>Descuento extra ${S.presu.extra}%</span><b>−${din(U.r2(sub-tot))}</b></div>`:'')
+    + `<div class="tot"><span>Total</span><span>${din(tot)}</span></div>` : '<p class="muted">Todavía no agregaste productos.</p>';
+}
+async function guardarPresu(){
+  const P=S.presu; const lineas=Object.entries(P.lineas).filter(([,q])=>q>0).map(([id,cantidad])=>({id,cantidad}));
+  if(!lineas.length) return U.toast('Agregá productos','error');
+  if(!P.cliente.trim()) return U.toast('Poné el nombre del cliente','error');
+  $('prGuardar').disabled=true;
+  try{
+    const r = await A('guardarPresupuesto',{cliente:P.cliente.trim(), tarifa:P.tarifa, descuentoExtra:P.extra, notas:P.notas, lineas});
+    imprimirDoc('PRESUPUESTO', r.id, r.fecha, P.cliente, r.lineas, r.subtotal, P.extra, r.total, r.valido, P.notas);
+    S.presu={lineas:{},cliente:'',tarifa:'General',extra:0,notas:''}; await cargar(true);
+  }catch(e){ U.toast(e.message,'error'); $('prGuardar').disabled=false; }
+}
+function imprimirDoc(tipo, id, fecha, cliente, lineas, sub, extra, total, valido, notas){
+  const cfg=S.d.config; const cli=S.d.clientes.find(c=>c.Nombre===cliente)||{};
+  $('impresion').innerHTML = `<div class="cabp"><div><h1>${U.esc(cfg.Empresa||'')}</h1>${cfg.WhatsApp?`<div>Tel/WhatsApp: ${U.esc(cfg.WhatsApp)}</div>`:''}</div>
+    <div style="text-align:right"><b style="font-size:16pt">${tipo}</b><div>Nº ${U.esc(id)}</div><div>Fecha: ${U.fecha(fecha)}</div>${valido?`<div>Válido hasta: ${U.fecha(valido)}</div>`:''}</div></div>
+    <p><b>Cliente:</b> ${U.esc(cliente)}${cli['Dirección']?'<br><b>Dirección:</b> '+U.esc(cli['Dirección']):''}</p>
+    <table><tr><th>Producto</th><th>Presentación</th><th class="num">Cant.</th><th class="num">Precio unit.</th><th class="num">Importe</th></tr>
+    ${lineas.map(l=>`<tr><td>${U.esc(l.nombre)}${l.oferta?' (oferta)':''}</td><td>${U.esc(l.unidad||'')}</td><td class="num">${l.cantidad}</td><td class="num">${din(l.precio)}</td><td class="num">${din(l.subtotal)}</td></tr>`).join('')}
+    ${extra?`<tr><td colspan="4" class="num">Subtotal</td><td class="num">${din(sub)}</td></tr><tr><td colspan="4" class="num">Descuento ${extra}%</td><td class="num">−${din(U.r2(sub-total))}</td></tr>`:''}
+    <tr><td colspan="4" class="num"><b>TOTAL</b></td><td class="num"><b style="font-size:14pt">${din(total)}</b></td></tr></table>
+    ${notas?`<p><b>Notas:</b> ${U.esc(notas)}</p>`:''}`;
+  setTimeout(()=>window.print(),100);
+}
+
+/* ====================== AJUSTES ====================== */
+function vAjustes(){
+  const c=S.d.config;
+  $('main').innerHTML = `<h2>Ajustes</h2><div class="card" style="padding:18px;max-width:520px">
+  <div class="campo"><label>Nombre de la empresa</label><input id="aEmp" value="${U.esc(c.Empresa||'')}"></div>
+  <div class="grid2"><div class="campo"><label>Moneda</label><input id="aMon" value="${U.esc(c.Moneda||'$')}"></div>
+  <div class="campo"><label>Validez presupuestos (días)</label><input id="aVal" type="number" value="${U.esc(c['Validez presupuesto (días)']||15)}"></div></div>
+  <div class="campo"><label>Tu WhatsApp (los clientes te avisan acá al hacer un pedido)</label><input id="aWa" value="${U.esc(c.WhatsApp||'')}" placeholder="549381…"></div>
+  <div class="campo"><label>PIN de administrador</label><input id="aPin" value="${U.esc(c['PIN admin']||'')}"></div>
+  <button class="btn" id="aOk">Guardar ajustes</button></div>
+  <p class="muted" style="margin-top:16px">Enlace de la app de clientes: <a href="index.html" target="_blank">index.html</a> (cada cliente usa su enlace personal desde “Clientes”).</p>`;
+  $('aOk').onclick = async()=>{ const pin=$('aPin').value.trim(); if(!pin) return U.toast('El PIN no puede quedar vacío','error');
+    await A('guardarConfig',{item:{Empresa:$('aEmp').value,Moneda:$('aMon').value||'$','Validez presupuesto (días)':Number($('aVal').value)||15,WhatsApp:$('aWa').value.replace(/\s/g,''),'PIN admin':pin}});
+    S.pin=pin; U.toast('Ajustes guardados'); await cargar(true); };
+}
+
+/* ====================== EVENTOS ====================== */
+document.addEventListener('click', async e=>{
+  const t = e.target.closest('[data-sec],[data-filtro],[data-abrir],[data-confirmar],[data-mov],[data-editprod],[data-edittarifa],[data-subir],[data-editof],[data-editcli],[data-copiar],[data-pp],[data-reimp],[data-apedido],[data-imprimir-ped]');
+  if(!t) return;
+  const d=t.dataset;
+  if(d.sec){ S.sec=d.sec; $('nav').classList.remove('abierto'); pintar(); }
+  else if(d.filtro){ S.filtro=d.filtro; vPedidos(); }
+  else if(d.abrir){ $('p_'+d.abrir).classList.toggle('abierto'); }
+  else if(d.confirmar){ await hacer('estadoPedido',{id:d.confirmar,estado:'Confirmado'},'Pedido confirmado'); }
+  else if(d.mov){ modalMov(d.mov,d.tipo); }
+  else if(d.editprod!==undefined){ modalProd(d.editprod); }
+  else if(d.edittarifa!==undefined){ modalTarifa(d.edittarifa); }
+  else if(d.subir!==undefined){ modalSubir(); }
+  else if(d.editof!==undefined){ modalOferta(d.editof); }
+  else if(d.editcli!==undefined){ modalCliente(d.editcli); }
+  else if(d.copiar){ try{ await navigator.clipboard.writeText(d.copiar); U.toast('Enlace copiado'); }catch(err){ prompt('Copiá el enlace:', d.copiar); } }
+  else if(d.pp){ S.presu.lineas[d.pp]=(S.presu.lineas[d.pp]||0)+1; vPresupuestosRefrescar(); }
+  else if(d.reimp){ const p=S.d.presupuestos.find(x=>x.ID===d.reimp); const sub=p.Detalle.reduce((s,l)=>s+l.subtotal,0); imprimirDoc('PRESUPUESTO',p.ID,p.Fecha,p.Cliente,p.Detalle,U.r2(sub),Number(p['Descuento extra %'])||0,p.Total,p['Válido hasta'],p.Notas); }
+  else if(d.apedido){ if(confirm('¿Crear un pedido con este presupuesto?')){ await hacer('presupuestoAPedido',{id:d.apedido},'Pedido creado'); } }
+  else if(d.imprimirPed){ const p=S.d.pedidos.find(x=>x.ID===d.imprimirPed); imprimirDoc('REMITO / PEDIDO',p.ID,p.Fecha,p.Cliente,p.Detalle,p.Total,0,p.Total,'',p['Notas cliente']); }
+});
+document.addEventListener('contextmenu', e=>{ const t=e.target.closest('[data-pp]'); if(!t) return; e.preventDefault();
+  const id=t.dataset.pp; S.presu.lineas[id]=Math.max(0,(S.presu.lineas[id]||0)-1); if(!S.presu.lineas[id]) delete S.presu.lineas[id]; vPresupuestosRefrescar(); });
+document.addEventListener('change', async e=>{
+  const t=e.target, d=t.dataset;
+  if(d.estado){ await hacer('estadoPedido',{id:d.estado,estado:t.value},'Estado: '+t.value); }
+  else if(d.notas){ await A('estadoPedido',{id:d.notas,estado:S.d.pedidos.find(p=>p.ID===d.notas).Estado,notas:t.value}); U.toast('Nota guardada'); }
+  else if(d.prq){ const q=parseInt(t.value)||0; if(q>0) S.presu.lineas[d.prq]=q; else delete S.presu.lineas[d.prq]; vPresupuestosRefrescar(); }
+});
+$('bMenu').onclick = () => $('nav').classList.toggle('abierto');
+$('bLogin').onclick = () => { S.pin=$('pin').value.trim(); if(S.pin) cargar(); };
+$('pin').onkeydown = e => { if(e.key==='Enter') $('bLogin').click(); };
+$('bSalir').onclick = e => { e.preventDefault(); sessionStorage.removeItem('pl_pin'); location.reload(); };
+$('bRefrescar').onclick = e => { e.preventDefault(); cargar(true).then(()=>U.toast('Datos actualizados')); };
+// Revisa pedidos nuevos cada 60 s
+setInterval(async()=>{ if(!S.d||document.hidden||$('modal').innerHTML||/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName)) return; const antes=S.d.pedidos.filter(p=>p.Estado==='Nuevo').length;
+  await cargar(true); const ahora=S.d.pedidos.filter(p=>p.Estado==='Nuevo').length; if(ahora>antes) U.toast('🔔 Llegó un pedido nuevo'); }, 60000);
+
+if(DEMO) $('pistaDemo').textContent='Modo demo: el PIN es 1234';
+if(S.pin) cargar(); else ver('vLogin');
+</script>
+</body>
+</html>

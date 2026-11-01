@@ -1,0 +1,51 @@
+:root{
+  --pri:#0e7490; --pri-2:#155e75; --pri-cl:#ecfeff; --acc:#f59e0b; --ok:#16a34a; --mal:#dc2626; --warn:#d97706;
+  --tx:#0f172a; --tx2:#475569; --borde:#e2e8f0; --fondo:#f8fafc; --card:#fff; --r:14px;
+  --sombra:0 1px 2px rgba(15,23,42,.06),0 4px 14px rgba(15,23,42,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--fondo);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--pri)}
+.oculto{display:none!important}
+.demo-banner{background:#fef3c7;color:#92400e;text-align:center;font-size:12px;padding:5px 8px}
+.btn{border:0;border-radius:10px;padding:10px 16px;background:var(--pri);color:#fff;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;justify-content:center;text-decoration:none}
+.btn:hover{background:var(--pri-2)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.sec{background:#fff;color:var(--pri);border:1.5px solid var(--pri)}
+.btn.sec:hover{background:var(--pri-cl)}
+.btn.gris{background:#f1f5f9;color:var(--tx)}
+.btn.rojo{background:#fff;color:var(--mal);border:1.5px solid #fecaca}
+.btn.wa{background:#25d366}
+.btn.peq{padding:6px 10px;font-size:13px;border-radius:8px}
+.btn.grande{padding:14px 20px;font-size:16px;width:100%}
+input,select,textarea{border:1.5px solid var(--borde);border-radius:10px;padding:9px 11px;background:#fff;width:100%;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--pri)}
+label{font-size:12px;color:var(--tx2);font-weight:600;display:block;margin:0 0 4px}
+.campo{margin-bottom:12px}
+.fila{display:flex;gap:10px;align-items:center}
+.fila>*{flex:1}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--sombra);border:1px solid var(--borde)}
+.chip{display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:600;background:#f1f5f9;color:var(--tx2);white-space:nowrap}
+.chip.Nuevo{background:#dbeafe;color:#1d4ed8}.chip.Confirmado{background:#e0e7ff;color:#4338ca}.chip.Preparado{background:#fef3c7;color:#b45309}
+.chip.Enviado{background:#cffafe;color:#0e7490}.chip.Entregado{background:#dcfce7;color:#15803d}.chip.Cancelado{background:#fee2e2;color:#b91c1c}
+.chip.oferta{background:#fff7ed;color:#c2410c}.chip.poco{background:#fef3c7;color:#b45309}.chip.sin{background:#fee2e2;color:#b91c1c}
+.tachado{text-decoration:line-through;color:#94a3b8;font-size:12px}
+.muted{color:var(--tx2);font-size:13px}
+.stepper{display:flex;align-items:center;border:1.5px solid var(--borde);border-radius:10px;overflow:hidden;background:#fff}
+.stepper button{border:0;background:#f1f5f9;width:38px;height:38px;font-size:20px;cursor:pointer;color:var(--pri);font-weight:700}
+.stepper input{border:0;width:46px;text-align:center;padding:0;height:38px;border-radius:0;font-weight:700}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:#0f172a;color:#fff;padding:10px 16px;border-radius:10px;opacity:0;pointer-events:none;transition:.25s;z-index:999;max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%)}
+#toast.error{background:var(--mal)}
+.cargando{padding:40px;text-align:center;color:var(--tx2)}
+.spin{width:28px;height:28px;border:3px solid #cbd5e1;border-top-color:var(--pri);border-radius:50%;animation:g 1s linear infinite;margin:0 auto 10px}
+@keyframes g{to{transform:rotate(360deg)}}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--borde);font-size:14px;vertical-align:middle}
+th{font-size:12px;color:var(--tx2);text-transform:uppercase;letter-spacing:.03em;background:#f8fafc}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.modal-fondo{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:flex-end;justify-content:center;z-index:50}
+.modal{background:#fff;width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px}
+@media(min-width:700px){.modal-fondo{align-items:center}.modal{border-radius:18px}}
+.modal h3{margin:0 0 14px}
