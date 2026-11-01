@@ -48,6 +48,14 @@
   .tot{display:flex;justify-content:space-between;font-weight:800;font-size:20px;margin:10px 0}
   .login{max-width:340px;margin:12vh auto;padding:26px;text-align:center}
   .menu-movil{display:none}
+  .foto-box{display:flex;gap:14px;align-items:center;margin-bottom:14px}
+  .foto-box img{width:120px;height:120px;border-radius:14px;object-fit:cover;background:#f1f5f9;border:1px solid var(--borde)}
+  .foto-box .bts{display:flex;flex-direction:column;gap:8px;flex:1}
+  .foto-box input[type=file]{display:none}
+  .cam{position:relative;display:inline-block}
+  .cam .mini{display:block}
+  .cam span{position:absolute;right:-6px;bottom:-6px;background:#fff;border-radius:50%;width:22px;height:22px;font-size:12px;display:flex;align-items:center;justify-content:center;box-shadow:var(--sombra)}
+  .subiendo{opacity:.5}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   @media(max-width:860px){
     nav{position:fixed;inset:0 auto 0 0;z-index:40;transform:translateX(-100%);transition:.2s}
@@ -90,7 +98,7 @@
       <button data-sec="stock">📦 Stock <span class="badge" id="nBajos"></span></button>
       <button data-sec="productos">🏷️ Productos y tarifas</button>
       <button data-sec="ofertas">🔥 Ofertas</button>
-      <button data-sec="clientes">👥 Clientes</button>
+      <button data-sec="clientes">👥 Clientes <span class="badge" id="nPend"></span></button>
       <button data-sec="presupuestos">🧾 Presupuestos</button>
       <button data-sec="ajustes">⚙️ Ajustes</button>
       <div class="pie"><a href="#" id="bRefrescar" style="color:#94a3b8">↻ Actualizar datos</a><br><a href="#" id="bSalir" style="color:#94a3b8">Salir</a></div>
@@ -131,6 +139,8 @@ function badges(){
   const b = S.d.productos.filter(p=>U.si(p.Activo) && Number(p.Stock)<=Number(p['Stock mínimo'])).length;
   $('nNuevos').textContent = n||''; $('nNuevos').classList.toggle('oculto',!n);
   $('nBajos').textContent = b||''; $('nBajos').classList.toggle('oculto',!b);
+  const pe = S.d.clientes.filter(c=>String(c.Activo).toUpperCase()==='PENDIENTE').length;
+  $('nPend').textContent = pe||''; $('nPend').classList.toggle('oculto',!pe);
 }
 async function hacer(accion, datos, msg){
   try{ const r = await A(accion, datos); if(msg) U.toast(msg); await cargar(true); return r; }
@@ -161,7 +171,7 @@ function vPedidos(){
     <div class="kpi card"><b>${ps.filter(p=>String(p.Fecha).slice(0,10)===hoy).length}</b><span>Recibidos hoy</span></div>
     <div class="kpi card"><b>${din(ventasMes)}</b><span>Vendido este mes</span></div>
   </div>
-  <div class="barra-sup"><div class="filtros">${filtros.map(f=>`<button class="${f===S.filtro?'on':''}" data-filtro="${f}">${f}</button>`).join('')}</div></div>
+  <div class="barra-sup"><div class="filtros">${filtros.map(f=>`<button class="${f===S.filtro?'on':''}" data-filtro="${f}">${f}</button>`).join('')}</div><span class="esp"></span><button class="btn sec peq" data-exppd>⬇ Exportar para facturar (CSV)</button></div>
   ${lista.length ? lista.map(pedidoHTML).join('') : '<div class="card cargando">No hay pedidos en esta vista.</div>'}`;
 }
 function pedidoHTML(p){
@@ -179,6 +189,7 @@ function pedidoHTML(p){
       ${p.Detalle.map(l=>{ const s=Number(prod(l.id).Stock); return `<tr><td>${U.esc(l.nombre)} ${l.oferta?'<span class="chip oferta">oferta</span>':''}</td><td class="num">${l.cantidad}</td><td class="num">${din(l.precio)}</td><td class="num">${din(l.subtotal)}</td><td>${p['Stock descontado']==='SI'?'<span class="muted">descontado</span>':(s<l.cantidad?`<span class="chip sin">hay ${s}</span>`:`<span class="muted">hay ${s}</span>`)}</td></tr>`; }).join('')}
       <tr><td colspan="3"><b>Total</b></td><td class="num"><b>${din(p.Total)}</b></td><td></td></tr></table></div>
       ${p['Notas cliente']?`<p><b>Notas del cliente:</b> ${U.esc(p['Notas cliente'])}</p>`:''}
+      <p class="muted" style="margin:6px 0">${cli['CUIT/DNI']?`Facturar a: <b>${U.esc(cli['Razón social']||cli.Nombre)}</b> · ${U.esc(cli['CUIT/DNI'])} · ${U.esc(cli['Condición IVA']||'')} · ${U.esc(cli['Dirección fiscal']||'')}${cli.Localidad?', '+U.esc(cli.Localidad):''}`:'⚠️ Cliente sin datos de facturación'}</p>
       <div class="campo" style="margin-top:10px"><label>Notas internas</label><input data-notas="${p.ID}" value="${U.esc(p['Notas internas']||'')}" placeholder="Solo las ves vos"></div>
       <div class="fila" style="justify-content:flex-start;gap:8px">
         ${p.Estado==='Nuevo'?`<button class="btn peq" style="flex:0 0 auto" data-confirmar="${p.ID}">✓ Confirmar (descuenta stock)</button>`:''}
@@ -228,9 +239,9 @@ function modalMov(id, tipo){
 function vProductos(){
   const ts = S.d.tarifas;
   $('main').innerHTML = `<h2>Productos y tarifas</h2>
-  <div class="barra-sup"><span class="muted">Tocá un producto para editarlo (nombre, precio, foto…).</span><span class="esp"></span><button class="btn" data-editprod="">+ Nuevo producto</button></div>
+  <div class="barra-sup"><span class="muted">Tocá un producto para editarlo, o 📷 para cambiar su foto. Los productos nuevos y activos aparecen al instante en la app de clientes.</span><span class="esp"></span><button class="btn" data-editprod="">+ Nuevo producto</button></div>
   <div class="card tabla"><table><tr><th></th><th>Producto</th><th>Categoría</th><th class="num">Precio lista</th>${ts.map(t=>`<th class="num">${U.esc(t.Tarifa)}<br><span style="text-transform:none">−${t['Descuento %']}%</span></th>`).join('')}<th>Activo</th></tr>
-  ${S.d.productos.map(p=>`<tr style="cursor:pointer" data-editprod="${p.ID}"><td><img class="mini" src="${U.esc(U.img(p.Imagen))}"></td><td><b>${U.esc(p.Producto)}</b><div class="muted">${U.esc(p.ID)} · ${U.esc(p.Unidad)}</div></td><td>${U.esc(p['Categoría'])}</td>
+  ${S.d.productos.map(p=>`<tr style="cursor:pointer" data-editprod="${p.ID}"><td><span class="cam" data-fotoprod="${p.ID}" title="Cambiar foto"><img class="mini" src="${U.esc(U.img(p.Imagen))}"><span>📷</span></span></td><td><b>${U.esc(p.Producto)}</b><div class="muted">${U.esc(p.ID)} · ${U.esc(p.Unidad)}</div></td><td>${U.esc(p['Categoría'])}</td>
   <td class="num"><b>${din(p.Precio)}</b></td>${ts.map(t=>`<td class="num">${din(U.r2(p.Precio*(1-t['Descuento %']/100)))}</td>`).join('')}<td>${U.si(p.Activo)?'✅':'—'}</td></tr>`).join('')}
   </table></div>
   <div class="barra-sup" style="margin-top:22px"><h3 style="margin:0">Tarifas</h3><span class="esp"></span><button class="btn sec peq" data-subir>% Subir/bajar precios</button><button class="btn peq" data-edittarifa="">+ Nueva tarifa</button></div>
@@ -243,20 +254,22 @@ function modalProd(id){
   const p = id ? prod(id) : { Activo:'SI', Stock:0, 'Stock mínimo':0, Imagen:'' };
   const cats = [...new Set(S.d.productos.map(x=>x['Categoría']).filter(Boolean))];
   modal(`<h3>${id?'Editar':'Nuevo'} producto</h3>
-  <div class="fila" style="align-items:flex-start"><img id="fImgPrev" src="${U.esc(U.img(p.Imagen))}" style="flex:0 0 90px;width:90px;height:90px;border-radius:12px">
-  <div><div class="campo"><label>Nombre</label><input id="fNom" value="${U.esc(p.Producto||'')}"></div>
-  <div class="campo"><label>Unidad / presentación</label><input id="fUni" value="${U.esc(p.Unidad||'')}" placeholder="Bidón 5 L, Unidad, Pack x10…"></div></div></div>
+  ${fotoHTML(p.Imagen)}
+  <div class="campo"><label>Nombre</label><input id="fNom" value="${U.esc(p.Producto||'')}"></div>
+  <div class="campo"><label>Unidad / presentación</label><input id="fUni" value="${U.esc(p.Unidad||'')}" placeholder="Bidón 5 L, Unidad, Pack x10…"></div>
   <div class="campo"><label>Descripción</label><input id="fDesc" value="${U.esc(p['Descripción']||'')}"></div>
   <div class="grid2"><div class="campo"><label>Categoría</label><input id="fCat" list="lcats" value="${U.esc(p['Categoría']||'')}"><datalist id="lcats">${cats.map(c=>`<option>${U.esc(c)}</option>`).join('')}</datalist></div>
   <div class="campo"><label>Precio de lista</label><input id="fPre" type="number" step="0.01" value="${p.Precio??''}"></div>
   ${id?'':`<div class="campo"><label>Stock inicial</label><input id="fSto" type="number" value="0"></div>`}
   <div class="campo"><label>Stock mínimo (alerta)</label><input id="fMin" type="number" value="${p['Stock mínimo']??0}"></div></div>
-  <div class="campo"><label>Imagen (ruta img/… o enlace a una foto)</label><input id="fImg" value="${U.esc(p.Imagen||'')}" placeholder="https://…/foto.jpg"></div>
+  <details style="margin-bottom:12px"><summary class="muted" style="cursor:pointer">Enlace de la imagen (avanzado)</summary><input id="fImg" value="${U.esc(p.Imagen||'')}" placeholder="https://…/foto.jpg" style="margin-top:6px"></details>
   <div class="campo"><label><input type="checkbox" id="fAct" style="width:auto" ${U.si(p.Activo)?'checked':''}> Visible para los clientes</label></div>
   <div class="fila"><button class="btn gris" onclick="cerrarModal()">Cancelar</button><button class="btn" id="fOk">Guardar</button></div>`);
   $('fImg').oninput = e => $('fImgPrev').src = U.img(e.target.value);
+  activarFoto($('fNom').value||'producto', url => { $('fImg').value = url; });
   $('fOk').onclick = async()=>{
     if(!$('fNom').value.trim()) return U.toast('Falta el nombre','error');
+    if(S.subiendo) return U.toast('Esperá a que termine de subir la foto','error');
     const item = { Producto:$('fNom').value.trim(), Unidad:$('fUni').value, 'Descripción':$('fDesc').value, 'Categoría':$('fCat').value, Precio:Number($('fPre').value)||0,
       'Stock mínimo':Number($('fMin').value)||0, Imagen:$('fImg').value.trim(), Activo:$('fAct').checked?'SI':'NO' };
     if(id) item.ID=id; else item.Stock=Number($('fSto').value)||0;
@@ -288,6 +301,37 @@ function modalSubir(){
     try{ for(const p of lista){ await A('guardarProducto',{item:{ID:p.ID, Precio:Math.round(p.Precio*(1+pct/100)/red)*red}}); }
       U.toast('Precios actualizados'); cerrarModal(); await cargar(true); }catch(e){ U.toast(e.message,'error'); }
   };
+}
+
+/* ---------- fotos: cámara o galería ---------- */
+function fotoHTML(src){
+  return `<div class="foto-box"><img id="fImgPrev" src="${U.esc(U.img(src))}" alt="">
+    <div class="bts"><button type="button" class="btn" id="bCam">📷 Hacer foto</button><button type="button" class="btn sec" id="bGal">🖼️ Elegir de la galería</button>
+    <span class="muted" id="fEstado"></span></div>
+    <input type="file" id="inCam" accept="image/*" capture="environment"><input type="file" id="inGal" accept="image/*"></div>`;
+}
+function activarFoto(nombre, alSubir){
+  $('bCam').onclick = () => $('inCam').click();
+  $('bGal').onclick = () => $('inGal').click();
+  const al = async e => {
+    const f = e.target.files && e.target.files[0]; e.target.value=''; if(!f) return;
+    S.subiendo = true; $('fImgPrev').classList.add('subiendo'); $('fEstado').textContent='Subiendo foto…'; $('bCam').disabled=$('bGal').disabled=true;
+    try{
+      const data = await U.foto(f, 900); $('fImgPrev').src = data;
+      const r = await A('subirFoto',{base64:data, nombre});
+      alSubir(r.url); $('fEstado').textContent='✓ Foto lista';
+    }catch(err){ U.toast(err.message,'error'); $('fEstado').textContent='No se pudo subir: '+err.message; }
+    S.subiendo=false; $('fImgPrev').classList.remove('subiendo'); $('bCam').disabled=$('bGal').disabled=false;
+  };
+  $('inCam').onchange = al; $('inGal').onchange = al;
+}
+function modalFoto(id){
+  const p = prod(id);
+  modal(`<h3>Foto · ${U.esc(p.Producto)}</h3>${fotoHTML(p.Imagen)}
+    <div class="fila"><button class="btn gris" onclick="cerrarModal()">Cancelar</button><button class="btn" id="fotoOk" disabled>Guardar foto</button></div>`);
+  let nueva=null;
+  activarFoto(p.Producto, url => { nueva=url; $('fotoOk').disabled=false; });
+  $('fotoOk').onclick = async()=>{ $('fotoOk').disabled=true; try{ await hacer('guardarProducto',{item:{ID:id, Imagen:nueva}},'Foto actualizada'); cerrarModal(); }catch(e){ $('fotoOk').disabled=false; } };
 }
 
 /* ====================== OFERTAS ====================== */
@@ -325,35 +369,76 @@ function modalOferta(id){
 }
 
 /* ====================== CLIENTES ====================== */
-function urlCliente(c){ return location.href.replace(/admin\.html.*$/,'').replace(/[?#].*$/,'') + 'index.html?c=' + encodeURIComponent(c['Código acceso']); }
+function urlBase(){ return location.href.replace(/admin\.html.*$/,'').replace(/[?#].*$/,''); }
+function urlCliente(c){ return urlBase() + '?c=' + encodeURIComponent(c['Código acceso']); }
+const esPend = c => String(c.Activo).toUpperCase()==='PENDIENTE';
+const completo = c => U.OBLIGATORIOS.every(k=>String(c[k]||'').trim());
 function vClientes(){
-  $('main').innerHTML = `<h2>Clientes</h2>
-  <div class="barra-sup"><span class="muted">Cada cliente entra a la app con su enlace personal (lleva su código). Mandáselo por WhatsApp.</span><span class="esp"></span><button class="btn" data-editcli="">+ Nuevo cliente</button></div>
-  <div class="card tabla"><table><tr><th>Cliente</th><th>Teléfono</th><th>Tarifa</th><th>Código</th><th class="num">Pedidos</th><th class="num">Comprado</th><th></th></tr>
-  ${S.d.clientes.map(c=>{ const ps=S.d.pedidos.filter(p=>p['Cliente ID']===c.ID&&p.Estado!=='Cancelado');
+  const pend = S.d.clientes.filter(esPend);
+  const resto = S.d.clientes.filter(c=>!esPend(c));
+  const fila = c => { const ps=S.d.pedidos.filter(p=>p['Cliente ID']===c.ID&&p.Estado!=='Cancelado');
     const txt=`Hola ${c.Contacto||c.Nombre}! Desde ahora podés hacer tus pedidos acá: ${urlCliente(c)}`;
-    return `<tr style="${U.si(c.Activo)?'':'opacity:.5'}"><td><b>${U.esc(c.Nombre)}</b><div class="muted">${U.esc(c.Contacto||'')} ${c['Dirección']?'· '+U.esc(c['Dirección']):''}</div></td><td>${U.esc(c['Teléfono']||'')}</td>
-    <td><span class="chip">${U.esc(c.Tarifa)}</span></td><td><code>${U.esc(c['Código acceso'])}</code></td><td class="num">${ps.length}</td><td class="num">${din(ps.reduce((s,p)=>s+Number(p.Total),0))}</td>
-    <td style="white-space:nowrap;text-align:right"><button class="btn sec peq" data-copiar="${U.esc(urlCliente(c))}">Copiar enlace</button>
-    ${c['Teléfono']?`<a class="btn wa peq" target="_blank" href="${U.wa(c['Teléfono'],txt)}">Enviar</a>`:''}
-    <button class="btn gris peq" data-editcli="${c.ID}">Editar</button></td></tr>`; }).join('')}
-  </table></div>`;
+    return `<tr style="${U.si(c.Activo)||esPend(c)?'':'opacity:.5'}"><td><b>${U.esc(c['Razón social']||c.Nombre)}</b><div class="muted">${U.esc(c.Contacto||'')} ${c.Localidad?'· '+U.esc(c.Localidad):''}</div></td>
+    <td>${c['CUIT/DNI']?`${U.esc(c['CUIT/DNI'])}<div class="muted">${U.esc(c['Condición IVA']||'')}</div>`:'<span class="chip poco">Sin datos fiscales</span>'}</td>
+    <td>${U.esc(c['Teléfono']||'')}</td><td><span class="chip">${U.esc(c.Tarifa)}</span></td><td><code>${U.esc(c['Código acceso'])}</code></td><td class="num">${ps.length}</td><td class="num">${din(ps.reduce((s,p)=>s+Number(p.Total),0))}</td>
+    <td style="white-space:nowrap;text-align:right">${esPend(c)?`<button class="btn peq" data-aprobar="${c.ID}">✓ Aprobar</button> `:''}<button class="btn sec peq" data-copiar="${U.esc(urlCliente(c))}">Copiar enlace</button>
+    ${c['Teléfono']&&!esPend(c)?`<a class="btn wa peq" target="_blank" href="${U.wa(c['Teléfono'],txt)}">Enviar</a>`:''}
+    <button class="btn gris peq" data-editcli="${c.ID}">Ver / editar</button></td></tr>`; };
+  const cab = `<tr><th>Cliente</th><th>CUIT/DNI</th><th>Teléfono</th><th>Tarifa</th><th>Código</th><th class="num">Pedidos</th><th class="num">Comprado</th><th></th></tr>`;
+  $('main').innerHTML = `<h2>Clientes</h2>
+  <div class="card" style="padding:14px;margin-bottom:14px"><b>Enlace de alta para clientes nuevos</b>
+    <div class="muted" style="margin:4px 0 8px">Mandá este enlace a quien quiera ser cliente: rellena sus datos de facturación y te aparece aquí como pendiente para aprobar.</div>
+    <div class="fila"><input readonly value="${U.esc(urlBase()+'?registro=1')}" style="flex:3"><button class="btn sec" style="flex:0 0 auto" data-copiar="${U.esc(urlBase()+'?registro=1')}">Copiar</button></div></div>
+  ${pend.length?`<h3>Pendientes de aprobar (${pend.length})</h3><div class="card tabla" style="margin-bottom:16px"><table>${cab}${pend.map(fila).join('')}</table></div>`:''}
+  <div class="barra-sup"><span class="muted">${resto.filter(c=>!completo(c)).length} clientes todavía sin datos de facturación completos (se les piden al entrar).</span><span class="esp"></span>
+    <button class="btn sec" data-expcli>⬇ Exportar clientes (CSV)</button><button class="btn" data-editcli="">+ Nuevo cliente</button></div>
+  <div class="card tabla"><table>${cab}${resto.map(fila).join('')}</table></div>`;
 }
 function modalCliente(id){
-  const c = id ? S.d.clientes.find(x=>x.ID===id) : { Tarifa:'General', Activo:'SI' };
-  modal(`<h3>${id?'Editar':'Nuevo'} cliente</h3>
-  <div class="campo"><label>Nombre / comercio</label><input id="cNom" value="${U.esc(c.Nombre||'')}"></div>
-  <div class="grid2"><div class="campo"><label>Persona de contacto</label><input id="cCon" value="${U.esc(c.Contacto||'')}"></div>
-  <div class="campo"><label>Teléfono (WhatsApp, con código país)</label><input id="cTel" value="${U.esc(c['Teléfono']||'')}" placeholder="549381…"></div>
-  <div class="campo"><label>Email</label><input id="cEm" value="${U.esc(c.Email||'')}"></div>
-  <div class="campo"><label>Tarifa</label><select id="cTar">${S.d.tarifas.map(t=>`<option ${t.Tarifa===c.Tarifa?'selected':''}>${U.esc(t.Tarifa)}</option>`).join('')}</select></div></div>
-  <div class="campo"><label>Dirección de entrega</label><input id="cDir" value="${U.esc(c['Dirección']||'')}"></div>
-  <div class="campo"><label>Código de acceso (vacío = se genera solo)</label><input id="cCod" value="${U.esc(c['Código acceso']||'')}" style="text-transform:uppercase"></div>
-  <div class="campo"><label><input type="checkbox" id="cAct" style="width:auto" ${U.si(c.Activo)?'checked':''}> Puede hacer pedidos</label></div>
+  const c = id ? S.d.clientes.find(x=>x.ID===id) : { Tarifa:'General', Activo:'SI', Provincia:'Tucumán' };
+  const inp = (k, lab, ph) => `<div class="campo"><label>${lab}${U.OBLIGATORIOS.includes(k)?' *':''}</label><input data-ck="${k}" value="${U.esc(c[k]||'')}" placeholder="${ph||''}"></div>`;
+  const act = esPend(c)?'PENDIENTE':U.si(c.Activo)?'SI':'NO';
+  modal(`<h3>${id?'Cliente '+U.esc(c.ID):'Nuevo cliente'}</h3>
+  ${id&&c['Datos actualizados']?`<p class="muted" style="margin-top:-8px">Datos actualizados por el cliente: ${U.fecha(c['Datos actualizados'],true)}</p>`:''}
+  <div class="campo"><label>Nombre comercial (como lo ves vos)</label><input data-ck="Nombre" value="${U.esc(c.Nombre||'')}"></div>
+  <b style="color:var(--pri-2)">Facturación</b>
+  ${inp('Razón social','Razón social')}
+  <div class="grid2">${inp('CUIT/DNI','CUIT o DNI','Sin guiones')}
+  <div class="campo"><label>Condición IVA *</label><select data-ck="Condición IVA"><option value="">—</option>${U.CONDICIONES_IVA.map(x=>`<option ${x===c['Condición IVA']?'selected':''}>${x}</option>`).join('')}</select></div></div>
+  ${inp('Dirección fiscal','Domicilio fiscal')}
+  <div class="grid2">${inp('Localidad','Localidad')}${inp('Provincia','Provincia')}${inp('CP','CP')}<div></div></div>
+  <b style="color:var(--pri-2)">Contacto y entrega</b>
+  <div class="grid2">${inp('Contacto','Persona de contacto')}${inp('Teléfono','Teléfono (WhatsApp, con código país)','549381…')}</div>
+  ${inp('Email','Email')}${inp('Dirección','Dirección de entrega')}
+  <b style="color:var(--pri-2)">Acceso a la app</b>
+  <div class="grid2"><div class="campo"><label>Tarifa</label><select data-ck="Tarifa">${S.d.tarifas.map(t=>`<option ${t.Tarifa===c.Tarifa?'selected':''}>${U.esc(t.Tarifa)}</option>`).join('')}</select></div>
+  <div class="campo"><label>Estado</label><select data-ck="Activo"><option value="SI" ${act==='SI'?'selected':''}>Activo (puede pedir)</option><option value="PENDIENTE" ${act==='PENDIENTE'?'selected':''}>Pendiente de aprobar</option><option value="NO" ${act==='NO'?'selected':''}>Bloqueado</option></select></div></div>
+  <div class="campo"><label>Código de acceso (vacío = se genera solo)</label><input data-ck="Código acceso" value="${U.esc(c['Código acceso']||'')}" style="text-transform:uppercase"></div>
   <div class="fila"><button class="btn gris" onclick="cerrarModal()">Cancelar</button><button class="btn" id="cOk">Guardar</button></div>`);
-  $('cOk').onclick = async()=>{ if(!$('cNom').value.trim()) return U.toast('Falta el nombre','error');
-    const item={Nombre:$('cNom').value.trim(),Contacto:$('cCon').value,'Teléfono':$('cTel').value.replace(/\s/g,''),Email:$('cEm').value,Tarifa:$('cTar').value,'Dirección':$('cDir').value,'Código acceso':$('cCod').value.trim().toUpperCase(),Activo:$('cAct').checked?'SI':'NO'};
+  $('cOk').onclick = async()=>{
+    const item={}; document.querySelectorAll('[data-ck]').forEach(el=>item[el.dataset.ck]=el.value.trim());
+    item['CUIT/DNI']=item['CUIT/DNI'].replace(/\D/g,''); item['Teléfono']=item['Teléfono'].replace(/[^\d+]/g,''); item['Código acceso']=item['Código acceso'].toUpperCase();
+    if(!item.Nombre) item.Nombre=item['Razón social'];
+    if(!item.Nombre) return U.toast('Poné al menos el nombre','error');
+    if(item['CUIT/DNI'] && !U.docValido(item['CUIT/DNI']) && !confirm('El CUIT/DNI no parece válido. ¿Guardar igual?')) return;
     if(id) item.ID=id; $('cOk').disabled=true; try{ await hacer('guardarCliente',{item},'Cliente guardado'); cerrarModal(); }catch(e){ $('cOk').disabled=false; } };
+}
+function descargarCSV(nombre, filas){
+  const csv = filas.map(r=>r.map(v=>{ const t=String(v==null?'':v); return /[";\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t; }).join(';')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'})); a.download=nombre; a.click();
+}
+function exportarClientes(){
+  const cols=['ID','Razón social','CUIT/DNI','Condición IVA','Dirección fiscal','Localidad','Provincia','CP','Contacto','Teléfono','Email','Dirección','Tarifa','Código acceso','Activo'];
+  descargarCSV('clientes.csv',[cols, ...S.d.clientes.map(c=>cols.map(k=>c[k]))]);
+}
+function exportarPedidos(){
+  const mes = prompt('¿Qué mes exportar? (AAAA-MM)', new Date().toISOString().slice(0,7)); if(!mes) return;
+  const cl = id => S.d.clientes.find(c=>c.ID===id)||{};
+  const filas=[['Pedido','Fecha','Estado','Cliente ID','Razón social','CUIT/DNI','Condición IVA','Dirección fiscal','Localidad','Email','Producto','Cantidad','Precio unit.','Subtotal','Total pedido']];
+  S.d.pedidos.filter(p=>String(p.Fecha).slice(0,7)===mes && p.Estado!=='Cancelado').slice().reverse().forEach(p=>{ const c=cl(p['Cliente ID']);
+    p.Detalle.forEach(l=>filas.push([p.ID,U.fecha(p.Fecha),p.Estado,p['Cliente ID'],c['Razón social']||p.Cliente,c['CUIT/DNI'],c['Condición IVA'],c['Dirección fiscal'],c.Localidad,c.Email,l.nombre,l.cantidad,String(l.precio).replace('.',','),String(l.subtotal).replace('.',','),String(p.Total).replace('.',',')])); });
+  if(filas.length===1) return U.toast('No hay pedidos en '+mes,'error');
+  descargarCSV('pedidos-'+mes+'.csv', filas);
 }
 
 /* ====================== PRESUPUESTOS ====================== */
@@ -423,7 +508,8 @@ function imprimirDoc(tipo, id, fecha, cliente, lineas, sub, extra, total, valido
   const cfg=S.d.config; const cli=S.d.clientes.find(c=>c.Nombre===cliente)||{};
   $('impresion').innerHTML = `<div class="cabp"><div><h1>${U.esc(cfg.Empresa||'')}</h1>${cfg.WhatsApp?`<div>Tel/WhatsApp: ${U.esc(cfg.WhatsApp)}</div>`:''}</div>
     <div style="text-align:right"><b style="font-size:16pt">${tipo}</b><div>Nº ${U.esc(id)}</div><div>Fecha: ${U.fecha(fecha)}</div>${valido?`<div>Válido hasta: ${U.fecha(valido)}</div>`:''}</div></div>
-    <p><b>Cliente:</b> ${U.esc(cliente)}${cli['Dirección']?'<br><b>Dirección:</b> '+U.esc(cli['Dirección']):''}</p>
+    <p><b>Cliente:</b> ${U.esc(cli['Razón social']||cliente)}${cli['CUIT/DNI']?' · <b>CUIT/DNI:</b> '+U.esc(cli['CUIT/DNI']):''}${cli['Condición IVA']?' · '+U.esc(cli['Condición IVA']):''}
+    ${cli['Dirección fiscal']?'<br><b>Domicilio:</b> '+U.esc(cli['Dirección fiscal'])+(cli.Localidad?', '+U.esc(cli.Localidad):''):''}${cli['Dirección']?'<br><b>Entrega:</b> '+U.esc(cli['Dirección']):''}</p>
     <table><tr><th>Producto</th><th>Presentación</th><th class="num">Cant.</th><th class="num">Precio unit.</th><th class="num">Importe</th></tr>
     ${lineas.map(l=>`<tr><td>${U.esc(l.nombre)}${l.oferta?' (oferta)':''}</td><td>${U.esc(l.unidad||'')}</td><td class="num">${l.cantidad}</td><td class="num">${din(l.precio)}</td><td class="num">${din(l.subtotal)}</td></tr>`).join('')}
     ${extra?`<tr><td colspan="4" class="num">Subtotal</td><td class="num">${din(sub)}</td></tr><tr><td colspan="4" class="num">Descuento ${extra}%</td><td class="num">−${din(U.r2(sub-total))}</td></tr>`:''}
@@ -450,10 +536,15 @@ function vAjustes(){
 
 /* ====================== EVENTOS ====================== */
 document.addEventListener('click', async e=>{
-  const t = e.target.closest('[data-sec],[data-filtro],[data-abrir],[data-confirmar],[data-mov],[data-editprod],[data-edittarifa],[data-subir],[data-editof],[data-editcli],[data-copiar],[data-pp],[data-reimp],[data-apedido],[data-imprimir-ped]');
+  const t = e.target.closest('[data-fotoprod],[data-aprobar],[data-expcli],[data-exppd],[data-sec],[data-filtro],[data-abrir],[data-confirmar],[data-mov],[data-editprod],[data-edittarifa],[data-subir],[data-editof],[data-editcli],[data-copiar],[data-pp],[data-reimp],[data-apedido],[data-imprimir-ped]');
   if(!t) return;
   const d=t.dataset;
-  if(d.sec){ S.sec=d.sec; $('nav').classList.remove('abierto'); pintar(); }
+  if(d.fotoprod){ e.stopPropagation(); modalFoto(d.fotoprod); }
+  else if(d.aprobar){ const c=S.d.clientes.find(x=>x.ID===d.aprobar); await hacer('guardarCliente',{item:{ID:c.ID,Activo:'SI'}},'Cliente aprobado');
+    if(c['Teléfono'] && confirm('¿Avisarle por WhatsApp que ya puede hacer pedidos?')) window.open(U.wa(c['Teléfono'],`Hola ${c.Contacto||c['Razón social']}! Ya está aprobada tu alta. Entrá con tu código ${c['Código acceso']} acá: ${urlCliente(c)}`),'_blank'); }
+  else if(d.expcli!==undefined){ exportarClientes(); }
+  else if(d.exppd!==undefined){ exportarPedidos(); }
+  else if(d.sec){ S.sec=d.sec; $('nav').classList.remove('abierto'); pintar(); }
   else if(d.filtro){ S.filtro=d.filtro; vPedidos(); }
   else if(d.abrir){ $('p_'+d.abrir).classList.toggle('abierto'); }
   else if(d.confirmar){ await hacer('estadoPedido',{id:d.confirmar,estado:'Confirmado'},'Pedido confirmado'); }

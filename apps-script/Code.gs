@@ -18,7 +18,8 @@
 
 const HOJAS = {
   Productos:    ['ID', 'Producto', 'Descripción', 'Categoría', 'Unidad', 'Precio', 'Stock', 'Stock mínimo', 'Imagen', 'Activo'],
-  Clientes:     ['ID', 'Nombre', 'Contacto', 'Teléfono', 'Email', 'Dirección', 'Código acceso', 'Tarifa', 'Activo'],
+  Clientes:     ['ID', 'Nombre', 'Contacto', 'Teléfono', 'Email', 'Dirección', 'Código acceso', 'Tarifa', 'Activo',
+                 'Razón social', 'CUIT/DNI', 'Condición IVA', 'Dirección fiscal', 'Localidad', 'Provincia', 'CP', 'Fecha alta', 'Datos actualizados'],
   Tarifas:      ['Tarifa', 'Descuento %', 'Notas'],
   Ofertas:      ['ID', 'Producto ID', 'Título', 'Tipo', 'Valor', 'Cantidad mínima', 'Desde', 'Hasta', 'Activa'],
   Pedidos:      ['ID', 'Fecha', 'Cliente ID', 'Cliente', 'Detalle', 'Total', 'Estado', 'Notas cliente', 'Notas internas', 'Stock descontado', 'Actualizado'],
@@ -42,6 +43,13 @@ function setup() {
       sh.getRange(1, 1, 1, HOJAS[nombre].length).setValues([HOJAS[nombre]])
         .setFontWeight('bold').setBackground('#0e7490').setFontColor('#ffffff');
       sh.setFrozenRows(1);
+    } else {
+      // Agrega al final las columnas nuevas que falten (no toca las existentes)
+      const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+      HOJAS[nombre].filter(h => head.indexOf(h) < 0).forEach(h => {
+        const c = sh.getLastColumn() + 1;
+        sh.getRange(1, c).setValue(h).setFontWeight('bold').setBackground('#0e7490').setFontColor('#ffffff');
+      });
     }
   });
   const hoja1 = ss.getSheetByName('Hoja 1') || ss.getSheetByName('Sheet1');
@@ -84,6 +92,7 @@ function setup() {
     ]);
     ss.getSheetByName('Config').getRange('B3').setNumberFormat('@').setValue('1234');
   }
+  carpetaFotos(); // crea la carpeta de fotos en Drive (y pide el permiso de Drive la primera vez)
 }
 
 /* =========================== HTTP =========================== */
@@ -100,7 +109,7 @@ function manejar(req) {
   let out;
   try {
     const accion = req.accion || '';
-    const publicas = { catalogo: 1, crearPedido: 1, misPedidos: 1, info: 1 };
+    const publicas = { catalogo: 1, crearPedido: 1, misPedidos: 1, info: 1, misDatos: 1, guardarMisDatos: 1, registrarCliente: 1 };
     if (!publicas[accion]) verificarPin(req.pin);
     const fn = ACCIONES[accion];
     if (!fn) throw new Error('Acción desconocida: ' + accion);
@@ -114,9 +123,25 @@ function manejar(req) {
 const ACCIONES = {
   // ---------- públicas ----------
   info: () => ({ empresa: cfg('Empresa'), moneda: cfg('Moneda'), whatsapp: cfg('WhatsApp') }),
+  misDatos: req => datosPublicos(clientePorCodigo(req.codigo, true)),
+  guardarMisDatos: req => {
+    const cli = clientePorCodigo(req.codigo, true);
+    const item = limpiarDatos(req.datos); item.ID = cli.ID; item['Datos actualizados'] = new Date();
+    validarDatos(item, cli.ID);
+    guardarFila('Clientes', 'ID', item, 'C');
+    return datosPublicos(Object.assign({}, cli, item));
+  },
+  registrarCliente: req => {
+    const item = limpiarDatos(req.datos);
+    validarDatos(item, null);
+    item.Nombre = item['Razón social']; item.Tarifa = 'General'; item.Activo = 'PENDIENTE';
+    item['Código acceso'] = codigoNuevo(); item['Fecha alta'] = new Date(); item['Datos actualizados'] = new Date();
+    guardarFila('Clientes', 'ID', item, 'C');
+    return { codigo: item['Código acceso'], pendiente: true };
+  },
   catalogo: req => {
     const cli = clientePorCodigo(req.codigo);
-    return { cliente: { id: cli.ID, nombre: cli.Nombre, tarifa: cli.Tarifa }, empresa: cfg('Empresa'),
+    return { cliente: { id: cli.ID, nombre: cli.Nombre, tarifa: cli.Tarifa, datosCompletos: datosCompletos(cli) }, empresa: cfg('Empresa'),
              moneda: cfg('Moneda'), whatsapp: cfg('WhatsApp'), productos: catalogoPara(cli) };
   },
   crearPedido: req => crearPedido(req),
@@ -130,7 +155,7 @@ const ACCIONES = {
   todo: () => ({
     config: leerConfig(),
     productos: leer('Productos').map(productoOut),
-    clientes: leer('Clientes'),
+    clientes: leer('Clientes').map(fechasOut),
     tarifas: leer('Tarifas'),
     ofertas: leer('Ofertas').map(fechasOut),
     pedidos: leer('Pedidos').map(pedidoOut).reverse(),
@@ -139,10 +164,15 @@ const ACCIONES = {
     estados: ESTADOS
   }),
   guardarProducto: req => guardarFila('Productos', 'ID', req.item, 'P'),
+  subirFoto: req => subirFoto(req.base64, req.nombre || 'producto'),
   guardarCliente: req => {
-    if (!req.item['Código acceso']) req.item['Código acceso'] = codigoAleatorio();
-    const repetido = leer('Clientes').find(c => String(c['Código acceso']).toUpperCase() === String(req.item['Código acceso']).toUpperCase() && c.ID !== req.item.ID);
-    if (repetido) throw new Error('Ese código de acceso ya lo usa ' + repetido.Nombre);
+    // Código: se genera si viene vacío o si es un cliente nuevo sin código. Si no viene el campo, no se toca.
+    if (req.item['Código acceso'] === '' || (!req.item.ID && !req.item['Código acceso'])) req.item['Código acceso'] = codigoNuevo();
+    if (!req.item.ID) req.item['Fecha alta'] = new Date();
+    if (req.item['Código acceso']) {
+      const repetido = leer('Clientes').find(c => String(c['Código acceso']).toUpperCase() === String(req.item['Código acceso']).toUpperCase() && c.ID !== req.item.ID);
+      if (repetido) throw new Error('Ese código de acceso ya lo usa ' + repetido.Nombre);
+    }
     return guardarFila('Clientes', 'ID', req.item, 'C');
   },
   guardarTarifa: req => guardarFila('Tarifas', 'Tarifa', req.item, null),
@@ -234,12 +264,77 @@ function r2(n) { return Math.round(Number(n) * 100) / 100; }
 
 /* =========================== PRECIOS =========================== */
 
-function clientePorCodigo(codigo) {
+function clientePorCodigo(codigo, permitirPendiente) {
   const c = String(codigo || '').trim().toUpperCase();
   if (!c) throw new Error('Falta el código de cliente');
   const cli = leer('Clientes').find(x => String(x['Código acceso']).trim().toUpperCase() === c);
-  if (!cli || !si(cli.Activo)) throw new Error('Código de cliente no válido');
+  if (!cli) throw new Error('Código de cliente no válido');
+  const pend = String(cli.Activo).trim().toUpperCase() === 'PENDIENTE';
+  if (pend && !permitirPendiente) throw new Error('PENDIENTE: tu alta está pendiente de aprobación. Te avisamos cuando puedas hacer pedidos.');
+  if (!pend && !si(cli.Activo)) throw new Error('Código de cliente no válido');
   return cli;
+}
+
+/* =========================== DATOS DEL CLIENTE =========================== */
+
+const CAMPOS_CLIENTE = ['Razón social', 'CUIT/DNI', 'Condición IVA', 'Dirección fiscal', 'Localidad', 'Provincia', 'CP',
+                        'Contacto', 'Teléfono', 'Email', 'Dirección'];
+const OBLIGATORIOS = ['Razón social', 'CUIT/DNI', 'Condición IVA', 'Dirección fiscal', 'Localidad', 'Teléfono'];
+
+function limpiarDatos(d) {
+  const o = {};
+  CAMPOS_CLIENTE.forEach(k => { if (d && d[k] !== undefined) o[k] = String(d[k]).trim().slice(0, 200); });
+  if (o['CUIT/DNI']) o['CUIT/DNI'] = o['CUIT/DNI'].replace(/[^\d]/g, '');
+  if (o['Teléfono']) o['Teléfono'] = o['Teléfono'].replace(/[^\d+]/g, '');
+  return o;
+}
+
+function validarDatos(item, idPropio) {
+  const falta = OBLIGATORIOS.filter(k => !item[k]);
+  if (falta.length) throw new Error('Faltan datos: ' + falta.join(', '));
+  const doc = item['CUIT/DNI'];
+  if (!(doc.length === 11 || (doc.length >= 7 && doc.length <= 8))) throw new Error('El CUIT debe tener 11 números o el DNI 7-8');
+  const otro = leer('Clientes').find(c => String(c['CUIT/DNI']).replace(/\D/g, '') === doc && c.ID !== idPropio);
+  if (otro) throw new Error('Ya hay un cliente registrado con ese CUIT/DNI. Pedinos tu código de acceso.');
+}
+
+function datosCompletos(cli) { return OBLIGATORIOS.every(k => String(cli[k] || '').trim() !== ''); }
+
+function datosPublicos(cli) {
+  const o = { id: cli.ID, codigo: cli['Código acceso'], pendiente: String(cli.Activo).toUpperCase() === 'PENDIENTE', completos: datosCompletos(cli), datos: {} };
+  CAMPOS_CLIENTE.forEach(k => o.datos[k] = cli[k] === undefined ? '' : String(cli[k]));
+  if (!o.datos['Razón social'] && cli.Nombre) o.datos['Razón social'] = cli.Nombre;
+  return o;
+}
+
+function codigoNuevo() {
+  const usados = leer('Clientes').map(c => String(c['Código acceso']).toUpperCase());
+  let c; do { c = codigoAleatorio(); } while (usados.indexOf(c) >= 0);
+  return c;
+}
+
+/* =========================== FOTOS (Google Drive) =========================== */
+
+function carpetaFotos() {
+  const id = cfg('Carpeta fotos');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { } }
+  const carpeta = DriveApp.createFolder('PEDIDOS-LIMPIEZA fotos');
+  try { carpeta.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) { }
+  const sh = hoja('Config'); const vals = sh.getDataRange().getValues();
+  const i = vals.findIndex(r => r[0] === 'Carpeta fotos');
+  if (i > 0) sh.getRange(i + 1, 2).setValue(carpeta.getId()); else sh.appendRow(['Carpeta fotos', carpeta.getId()]);
+  return carpeta;
+}
+
+function subirFoto(base64, nombre) {
+  if (!base64) throw new Error('No llegó la foto');
+  const m = String(base64).match(/^data:(image\/[\w+.-]+);base64,(.*)$/);
+  const tipo = m ? m[1] : 'image/jpeg'; const datos = m ? m[2] : base64;
+  const blob = Utilities.newBlob(Utilities.base64Decode(datos), tipo,
+    String(nombre).replace(/[^\w\-]+/g, '_') + '_' + Utilities.formatDate(new Date(), 'GMT', 'yyyyMMdd-HHmmss') + '.jpg');
+  const f = carpetaFotos().createFile(blob);
+  f.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return { url: 'https://drive.google.com/thumbnail?id=' + f.getId() + '&sz=w800', id: f.getId() };
 }
 
 function tarifaDesc(nombre) {
@@ -305,6 +400,7 @@ function calcularLineas(lineas, desc) {
 
 function crearPedido(req) {
   const cli = clientePorCodigo(req.codigo);
+  if (!datosCompletos(cli)) throw new Error('Completá tus datos de facturación antes de enviar el pedido');
   const lineas = (req.lineas || []).map(l => ({ id: l.id, cantidad: l.cantidad })); // el precio lo calcula el servidor
   const calc = calcularLineas(lineas, tarifaDesc(cli.Tarifa));
   if (!calc.lineas.length) throw new Error('El pedido está vacío');

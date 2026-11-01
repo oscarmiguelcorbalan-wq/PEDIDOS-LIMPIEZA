@@ -46,6 +46,14 @@
   .ok-pedido{text-align:center;padding:10px}
   .ok-pedido .check{width:70px;height:70px;border-radius:50%;background:#dcfce7;color:var(--ok);font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
   .vacio{text-align:center;color:var(--tx2);padding:40px 10px}
+  .datos{max-width:620px;margin:0 auto}
+  .datos .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  @media(max-width:520px){.datos .grid2{grid-template-columns:1fr}}
+  .datos h4{margin:18px 0 8px;color:var(--pri-2)}
+  .aviso{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:14px}
+  .req::after{content:' *';color:var(--mal)}
+  .err-campo{border-color:var(--mal)!important}
+  .reg{max-width:620px;margin:20px auto;padding:20px}
 </style>
 </head>
 <body>
@@ -59,8 +67,14 @@
     <div class="campo"><input id="codigo" placeholder="Código de cliente" autocomplete="off" style="text-transform:uppercase;text-align:center;font-size:18px;letter-spacing:2px"></div>
     <button class="btn grande" id="bEntrar">Entrar</button>
     <p class="muted" id="lErr" style="color:var(--mal)"></p>
+    <hr style="border:0;border-top:1px solid var(--borde);margin:18px 0">
+    <p class="muted" style="margin:0 0 8px">¿Todavía no sos cliente?</p>
+    <button class="btn sec grande" id="bRegistro">Registrarme</button>
   </div>
 </section>
+
+<!-- REGISTRO / PENDIENTE -->
+<section id="vRegistro" class="oculto"><div class="reg card" id="regCont"></div></section>
 
 <!-- APP -->
 <section id="vApp" class="oculto">
@@ -69,7 +83,7 @@
       <div><h1 id="hEmpresa"></h1><div class="cli" id="hCliente"></div></div>
       <button class="salir" id="bSalir">Salir</button>
     </div>
-    <div class="tabs"><button data-tab="cat" class="on">Productos</button><button data-tab="ped">Mis pedidos</button></div>
+    <div class="tabs"><button data-tab="cat" class="on">Productos</button><button data-tab="ped">Mis pedidos</button><button data-tab="dat">Mis datos</button></div>
   </header>
   <main>
     <div id="tCat">
@@ -78,6 +92,7 @@
       <div class="grid" id="grid"></div>
     </div>
     <div id="tPed" class="oculto"><div id="listaPed"></div></div>
+    <div id="tDat" class="oculto"><div class="datos card" style="padding:18px" id="misDatos"></div></div>
   </main>
   <div class="barra oculto" id="barra"><button class="btn grande" id="bVerCarrito"><span id="bCant"></span><span id="bTot"></span></button></div>
 </section>
@@ -92,7 +107,7 @@ const S = { codigo:'', data:null, carrito:{}, cat:'Todos', q:'' };
 const $ = id => document.getElementById(id);
 const LS_COD = 'pl_codigo', LS_CAR = 'pl_carrito';
 
-function ver(v){ ['vLogin','vApp','vCarga'].forEach(x => $(x).classList.toggle('oculto', x!==v)); }
+function ver(v){ ['vLogin','vApp','vCarga','vRegistro'].forEach(x => $(x).classList.toggle('oculto', x!==v)); }
 
 async function entrar(cod){
   ver('vCarga');
@@ -104,7 +119,9 @@ async function entrar(cod){
     $('hEmpresa').textContent = S.data.empresa; $('hCliente').textContent = S.data.cliente.nombre;
     document.title = S.data.empresa + ' · Pedidos';
     ver('vApp'); pintarCats(); pintarGrid(); pintarBarra();
+    if(!S.data.cliente.datosCompletos) setTimeout(()=>{ irTab('dat'); U.toast('Completá tus datos para poder hacer pedidos'); },300);
   }catch(e){
+    if(/^PENDIENTE/.test(e.message)){ S.codigo=cod.toUpperCase(); localStorage.setItem(LS_COD,S.codigo); return pantallaPendiente(); }
     localStorage.removeItem(LS_COD); ver('vLogin'); $('lErr').textContent = e.message; $('codigo').value = cod;
   }
 }
@@ -152,7 +169,7 @@ function setCant(id, c){
 
 function pintarBarra(){
   const {t,n} = totalCarrito();
-  $('barra').classList.toggle('oculto', !n);
+  $('barra').classList.toggle('oculto', !n || $('tCat').classList.contains('oculto'));
   $('bCant').textContent = `Ver pedido (${n} ${n===1?'artículo':'artículos'})`;
   $('bTot').textContent = U.dinero(t, S.data.moneda);
 }
@@ -175,6 +192,7 @@ function abrirCarrito(){
 }
 
 async function enviar(){
+  if(!S.data.cliente.datosCompletos){ $('modal').innerHTML=''; irTab('dat'); return U.toast('Antes de enviar, completá tus datos de facturación','error'); }
   const b=$('bEnviar'); b.disabled=true; b.textContent='Enviando…';
   try{
     const lineas = Object.entries(S.carrito).map(([id,cantidad])=>({id,cantidad}));
@@ -206,25 +224,104 @@ async function pintarPedidos(){
   }catch(e){ $('listaPed').innerHTML = `<div class="vacio">${U.esc(e.message)}</div>`; }
 }
 
+/* ---------- datos del cliente ---------- */
+const ETQ = {'Razón social':'Razón social / Nombre y apellido','CUIT/DNI':'CUIT o DNI','Condición IVA':'Condición frente al IVA','Dirección fiscal':'Domicilio fiscal (calle y número)',
+  'Localidad':'Localidad','Provincia':'Provincia','CP':'Código postal','Contacto':'Persona de contacto','Teléfono':'Teléfono / WhatsApp','Email':'Email (para enviarte la factura)','Dirección':'Dirección de entrega (si es distinta)'};
+function campo(k, v){
+  const req = U.OBLIGATORIOS.includes(k) ? 'req' : '';
+  if(k==='Condición IVA') return `<div class="campo"><label class="${req}">${ETQ[k]}</label><select data-k="${k}"><option value="">Elegí…</option>${U.CONDICIONES_IVA.map(c=>`<option ${c===v?'selected':''}>${c}</option>`).join('')}</select></div>`;
+  const tipo = k==='Email'?'email':(k==='CUIT/DNI'||k==='Teléfono'||k==='CP')?'tel':'text';
+  const ph = {'CUIT/DNI':'Sin guiones','Teléfono':'Ej: 381 555 1234','Provincia':'Tucumán'}[k]||'';
+  return `<div class="campo"><label class="${req}">${ETQ[k]}</label><input type="${tipo}" data-k="${k}" value="${U.esc(v||'')}" placeholder="${ph}"></div>`;
+}
+function formDatos(d){
+  d = d || {};
+  return `<h4 style="margin-top:0">Datos de facturación</h4>
+    ${campo('Razón social',d['Razón social'])}
+    <div class="grid2">${campo('CUIT/DNI',d['CUIT/DNI'])}${campo('Condición IVA',d['Condición IVA'])}</div>
+    ${campo('Dirección fiscal',d['Dirección fiscal'])}
+    <div class="grid2">${campo('Localidad',d['Localidad'])}${campo('Provincia',d['Provincia']||'Tucumán')}</div>
+    <div class="grid2">${campo('CP',d['CP'])}<div></div></div>
+    <h4>Contacto y entrega</h4>
+    <div class="grid2">${campo('Contacto',d['Contacto'])}${campo('Teléfono',d['Teléfono'])}</div>
+    ${campo('Email',d['Email'])}
+    ${campo('Dirección',d['Dirección'])}
+    <p class="muted"><span style="color:var(--mal)">*</span> obligatorios</p>`;
+}
+function leerForm(cont){
+  const d={}; let ok=true; cont.querySelectorAll('[data-k]').forEach(el=>{ d[el.dataset.k]=el.value.trim(); el.classList.remove('err-campo'); });
+  U.OBLIGATORIOS.forEach(k=>{ if(!d[k]){ ok=false; cont.querySelector(`[data-k="${k}"]`).classList.add('err-campo'); } });
+  if(!ok){ U.toast('Completá los campos marcados','error'); return null; }
+  if(!U.docValido(d['CUIT/DNI'])){ cont.querySelector('[data-k="CUIT/DNI"]').classList.add('err-campo'); U.toast('El CUIT/DNI no es válido','error'); return null; }
+  if(d.Email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.Email)){ cont.querySelector('[data-k="Email"]').classList.add('err-campo'); U.toast('El email no es válido','error'); return null; }
+  return d;
+}
+async function pintarMisDatos(){
+  const c=$('misDatos'); c.innerHTML='<div class="cargando"><div class="spin"></div></div>';
+  try{
+    const r = await api('misDatos',{codigo:S.codigo});
+    c.innerHTML = (r.completos?'':'<div class="aviso">📋 Para poder hacer pedidos y facturarte, completá tus datos.</div>')
+      + formDatos(r.datos) + `<button class="btn grande" id="bGuardarDatos">Guardar mis datos</button>
+      <p class="muted" style="text-align:center">Tu código de cliente: <b>${U.esc(r.codigo)}</b></p>`;
+    $('bGuardarDatos').onclick = async()=>{
+      const d=leerForm(c); if(!d) return; const b=$('bGuardarDatos'); b.disabled=true; b.textContent='Guardando…';
+      try{ const r2=await api('guardarMisDatos',{codigo:S.codigo,datos:d}); U.toast('¡Datos guardados!');
+        if(S.data){ S.data.cliente.datosCompletos=r2.completos; if(r2.completos) irTab('cat'); } }catch(e){ U.toast(e.message,'error'); }
+      b.disabled=false; b.textContent='Guardar mis datos';
+    };
+  }catch(e){ c.innerHTML=`<div class="vacio">${U.esc(e.message)}</div>`; }
+}
+function irTab(t){ document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
+  $('tCat').classList.toggle('oculto',t!=='cat'); $('tPed').classList.toggle('oculto',t!=='ped'); $('tDat').classList.toggle('oculto',t!=='dat');
+  $('barra').classList.toggle('oculto', t!=='cat' || !totalCarrito().n);
+  if(t==='ped') pintarPedidos(); if(t==='dat') pintarMisDatos(); window.scrollTo(0,0); }
+function pantallaRegistro(){
+  ver('vRegistro');
+  $('regCont').innerHTML = `<h2 style="margin-top:0">Alta de cliente</h2><p class="muted">Completá tus datos. Cuando aprobemos tu alta vas a poder hacer pedidos desde esta app.</p>
+    ${formDatos({})}<button class="btn grande" id="bRegistrar">Enviar mis datos</button>
+    <button class="btn gris grande" style="margin-top:8px" id="bVolver">Ya tengo código</button>`;
+  $('bVolver').onclick = ()=> ver('vLogin');
+  $('bRegistrar').onclick = async()=>{
+    const d=leerForm($('regCont')); if(!d) return; const b=$('bRegistrar'); b.disabled=true; b.textContent='Enviando…';
+    try{ const r=await api('registrarCliente',{datos:d}); S.codigo=r.codigo; localStorage.setItem(LS_COD,r.codigo); pantallaPendiente(true); }
+    catch(e){ U.toast(e.message,'error'); b.disabled=false; b.textContent='Enviar mis datos'; }
+  };
+}
+async function pantallaPendiente(recien){
+  ver('vRegistro'); let wa='';
+  try{ const i=await api('info'); if(i.whatsapp) wa=U.wa(i.whatsapp,`Hola! Me registré como cliente en la app de pedidos. Mi código es ${S.codigo}.`); }catch(e){}
+  $('regCont').innerHTML = `<div class="ok-pedido"><div class="check">${recien?'✓':'⏳'}</div>
+    <h3>${recien?'¡Recibimos tus datos!':'Tu alta está pendiente'}</h3>
+    <p>Tu código de cliente es<br><b style="font-size:26px;letter-spacing:3px">${U.esc(S.codigo)}</b></p>
+    <p class="muted">Guardalo. Cuando aprobemos tu alta, entrás con este código y ya podés hacer pedidos.</p>
+    ${wa?`<a class="btn wa grande" style="margin-bottom:8px" target="_blank" href="${wa}">Avisar por WhatsApp</a>`:''}
+    <button class="btn grande" id="bReintentar" style="margin-bottom:8px">Ya me aprobaron, entrar</button>
+    <button class="btn gris grande" id="bEditarPend">Revisar mis datos</button></div>`;
+  $('bReintentar').onclick = ()=> entrar(S.codigo);
+  $('bEditarPend').onclick = async()=>{
+    $('regCont').innerHTML='<div id="misDatos"></div><button class="btn gris grande" style="margin-top:8px" id="bVolverPend">Volver</button>';
+    $('bVolverPend').onclick=()=>pantallaPendiente(); pintarMisDatos();
+  };
+}
+
 /* ---------- eventos ---------- */
 document.addEventListener('click', e=>{
   const t=e.target.closest('[data-mas],[data-menos],[data-c],[data-tab],[data-cerrar],[data-tog],[data-repetir]'); if(!t) return;
   if(t.dataset.mas){ setCant(t.dataset.mas,(S.carrito[t.dataset.mas]||0)+1); refrescar(); }
   else if(t.dataset.menos){ setCant(t.dataset.menos,(S.carrito[t.dataset.menos]||0)-1); refrescar(); }
   else if(t.dataset.c){ S.cat=t.dataset.c; pintarCats(); pintarGrid(); }
-  else if(t.dataset.tab){ document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b===t));
-    $('tCat').classList.toggle('oculto',t.dataset.tab!=='cat'); $('tPed').classList.toggle('oculto',t.dataset.tab!=='ped');
-    if(t.dataset.tab==='ped') pintarPedidos(); }
+  else if(t.dataset.tab){ irTab(t.dataset.tab); }
   else if(t.dataset.cerrar && e.target===t){ $('modal').innerHTML=''; pintarGrid(); }
   else if(t.dataset.tog){ $('det'+t.dataset.tog).classList.toggle('oculto'); }
   else if(t.dataset.repetir){ const p=S.pedidos[t.dataset.repetir]; const ids=new Set(S.data.productos.map(x=>x.id));
     p.Detalle.forEach(l=>{ if(ids.has(l.id)) S.carrito[l.id]=(S.carrito[l.id]||0)+l.cantidad; }); setCant('_',0);
-    document.querySelector('[data-tab=cat]').click(); pintarGrid(); U.toast('Productos agregados al pedido'); }
+    irTab('cat'); pintarGrid(); U.toast('Productos agregados al pedido'); }
 });
 document.addEventListener('change', e=>{ if(e.target.dataset.cant){ setCant(e.target.dataset.cant, e.target.value); refrescar(); } });
 function refrescar(){ if($('modal').innerHTML){ if(totalCarrito().n) abrirCarrito(); else $('modal').innerHTML=''; } pintarGrid(); }
 $('q').oninput = e => { S.q=e.target.value; pintarGrid(); };
 $('bVerCarrito').onclick = abrirCarrito;
+$('bRegistro').onclick = pantallaRegistro;
 $('bEntrar').onclick = () => { const c=$('codigo').value.trim(); if(c) entrar(c); };
 $('codigo').onkeydown = e => { if(e.key==='Enter') $('bEntrar').click(); };
 $('bSalir').onclick = () => { localStorage.removeItem(LS_COD); location.href = location.pathname + (DEMO && new URLSearchParams(location.search).get('demo')?'?demo=1':''); };
@@ -233,7 +330,8 @@ $('bSalir').onclick = () => { localStorage.removeItem(LS_COD); location.href = l
 (async()=>{
   const p = new URLSearchParams(location.search);
   const cod = p.get('c') || localStorage.getItem(LS_COD);
-  if(cod) entrar(cod);
+  if(p.get('registro')==='1' && !p.get('c')) pantallaRegistro();
+  else if(cod) entrar(cod);
   else { ver('vLogin'); try{ const i=await api('info'); $('lEmpresa').textContent=i.empresa; }catch(e){} }
 })();
 </script>
